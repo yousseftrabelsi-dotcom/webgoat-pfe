@@ -50,5 +50,15 @@ jobs:
         run: pip install google-generativeai
       - name: Run AI Agent
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python scripts/ai_analyzer.py
+          - name: Run AI Agent
+     env:
+       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+     run: |
+       python scripts/ai_analyzer.py
+       echo "=== VOICI L'ANALYSE DE L'IA ==="
+       cat ai-security-summary.txt
+   - name: Upload AI Report
+     uses: actions/upload-artifact@v4
+     with:
+       name: PFE-AI-Report
+       path: ai-security-summary.txt
