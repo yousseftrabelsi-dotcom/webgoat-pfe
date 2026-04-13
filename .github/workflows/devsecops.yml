@@ -47,7 +47,7 @@ jobs:
         with:
           python-version: '3.9'
       - name: Install AI Tool
-        run: pip install google-generativeai
+        run: pip install google-genai
       - name: Run AI Agent
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
