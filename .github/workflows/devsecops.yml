@@ -20,15 +20,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build Image Docker
-        run: docker build -t webgoat-pfe .
       - name: Run Trivy Scan
         continue-on-error: true
         run: |
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-          aquasec/trivy:latest image --format json --output trivy-results.json webgoat-pfe
+          docker run --rm -v ${{ github.workspace }}:/app aquasec/trivy:latest fs --format json --output /app/trivy-results.json /app
       - name: Upload Report
-        if: always() # <--- CETTE LIGNE EST LA CLÉ : Force l'upload même si Trivy échoue
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: reports
