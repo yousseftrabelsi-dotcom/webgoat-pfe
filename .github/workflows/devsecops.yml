@@ -20,15 +20,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build Image
+      - name: Build Image Docker
         run: docker build -t webgoat-pfe .
-      - name: Run Trivy
-        uses: aquasec/trivy-action@v0.20.0 # Version précise corrigée
-        with:
-          image-ref: 'webgoat-pfe'
-          format: 'json'
-          output: 'trivy-results.json'
-          severity: 'CRITICAL,HIGH'
+      - name: Run Trivy Scan
+        # On utilise l'image docker officielle de Trivy directement
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+          aquasec/trivy:latest image --format json --output trivy-results.json webgoat-pfe
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
