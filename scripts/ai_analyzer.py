@@ -3,7 +3,7 @@ import google.generativeai as genai
 
 # Configuration de l'IA avec ta clé secrète
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 def run_analysis():
     print("Démarrage de l'analyse IA...")
