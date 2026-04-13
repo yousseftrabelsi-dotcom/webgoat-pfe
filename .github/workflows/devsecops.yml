@@ -22,12 +22,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build Image
         run: docker build -t webgoat-pfe .
-      - name: Run Trivy (JSON)
-        uses: aquasec/trivy-action@master
+      - name: Run Trivy
+        uses: aquasec/trivy-action@v0.20.0 # Version précise corrigée
         with:
           image-ref: 'webgoat-pfe'
           format: 'json'
           output: 'trivy-results.json'
+          severity: 'CRITICAL,HIGH'
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
@@ -43,9 +44,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reports
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
       - name: Install AI Tool
         run: pip install google-generativeai
       - name: Run AI Agent
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python3 scripts/ai_analyzer.py
+        run: python scripts/ai_analyzer.py
