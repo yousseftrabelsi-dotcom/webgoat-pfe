@@ -12,7 +12,7 @@ with open('trivy-results.json', 'r') as fichier:
 
 # 3. Appel à Gemini avec la nouvelle syntaxe
 response = client.models.generate_content(
-    model='gemini-1.5-flash',
+    model='gemini-2.5-flash',
     contents="Tu es un expert DevSecOps. Fais un résumé clair et concis (en français) des vulnérabilités trouvées dans ce rapport Trivy : " + rapport
 )
 
