@@ -4,7 +4,6 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # 1. Scan des secrets
   secrets-scan:
     runs-on: ubuntu-latest
     steps:
@@ -16,17 +15,37 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # 2. Scan du conteneur
-  container-security:
+  vulnerability-scan:
     needs: secrets-scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build Docker Image
-        run: docker build -t webgoat-pfe:latest .
-      - name: Run Trivy
+      - name: Build Image
+        run: docker build -t webgoat-pfe .
+      - name: Run Trivy (JSON)
         uses: aquasec/trivy-action@master
         with:
-          image-ref: 'webgoat-pfe:latest'
-          format: 'table'
-          exit-code: '0'
+          image-ref: 'webgoat-pfe'
+          format: 'json'
+          output: 'trivy-results.json'
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: trivy-results.json
+
+  ai-agent-analysis:
+    needs: vulnerability-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Report
+        uses: actions/download-artifact@v4
+        with:
+          name: reports
+      - name: Install AI Tool
+        run: pip install google-generativeai
+      - name: Run AI Agent
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python3 scripts/ai_analyzer.py
