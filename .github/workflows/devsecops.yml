@@ -1,0 +1,32 @@
+name: DevSecOps WebGoat Pipeline
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  # 1. Scan des secrets
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 2. Scan du conteneur
+  container-security:
+    needs: secrets-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker Image
+        run: docker build -t webgoat-pfe:latest .
+      - name: Run Trivy
+        uses: aquasec/trivy-action@master
+        with:
+          image-ref: 'webgoat-pfe:latest'
+          format: 'table'
+          exit-code: '0'
