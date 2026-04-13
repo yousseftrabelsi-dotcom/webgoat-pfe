@@ -1,32 +1,23 @@
 import os
-import google.generativeai as genai
+from google import genai
 
-# Configuration de l'IA avec ta clé secrète
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-1.5-flash')
+print("Démarrage de l'analyse IA...")
 
-def run_analysis():
-    print("Démarrage de l'analyse IA...")
-    
-    # On vérifie si le rapport Trivy existe
-    report_exists = os.path.exists("trivy-results.json")
-    
-    context = "Le scan Trivy a réussi." if report_exists else "Le scan Trivy a échoué (problème d'image Docker)."
-    
-    prompt = f"""
-    En tant qu'expert DevSecOps pour mon PFE, analyse cette situation : {context}.
-    Donne-moi 3 recommandations de sécurité pour une application Java comme WebGoat.
-    Réponds en français et sois concis.
-    """
-    
-    try:
-        response = model.generate_content(prompt)
-        with open("ai-security-summary.txt", "w", encoding="utf-8") as f:
-            f.write("=== RAPPORT DE L'AGENT IA (PFE YOUSSEF) ===\n")
-            f.write(response.text)
-        print("Rapport IA généré avec succès dans ai-security-summary.txt")
-    except Exception as e:
-        print(f"Erreur avec Gemini : {e}")
+# 1. Initialisation du nouveau client (il va chercher GEMINI_API_KEY tout seul)
+client = genai.Client()
 
-if __name__ == "__main__":
-    run_analysis()
+# 2. Lecture du rapport Trivy généré par le pipeline
+with open('trivy-results.json', 'r') as fichier:
+    rapport = fichier.read()
+
+# 3. Appel à Gemini avec la nouvelle syntaxe
+response = client.models.generate_content(
+    model='gemini-1.5-flash',
+    contents="Tu es un expert DevSecOps. Fais un résumé clair et concis (en français) des vulnérabilités trouvées dans ce rapport Trivy : " + rapport
+)
+
+# 4. Sauvegarde du résultat dans le fichier final
+with open('ai-security-summary.txt', 'w', encoding='utf-8') as f:
+    f.write(response.text)
+
+print("Analyse terminée avec succès !")
