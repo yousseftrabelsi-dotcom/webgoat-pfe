@@ -3,6 +3,11 @@ on:
   push:
     branches: [ "main" ]
 
+# OPTION A : Ajout des permissions pour permettre à ZAP de créer des issues
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   # 1. Recherche de secrets dans le code
   secrets-scan:
@@ -53,7 +58,7 @@ jobs:
           name: reports
           path: trivy-results.json
 
-  # 4. Analyse dynamique (DAST) avec OWASP ZAP (Version Corrigée)
+  # 4. Analyse dynamique (DAST) avec OWASP ZAP
   dast-scan:
     needs: vulnerability-scan
     runs-on: ubuntu-latest
@@ -75,6 +80,7 @@ jobs:
         with:
           target: 'http://localhost:8080/WebGoat'
           fail_action: false
+          # ZAP va maintenant pouvoir utiliser les permissions 'issues: write' définies plus haut
 
       - name: Upload ZAP Report
         if: always()
