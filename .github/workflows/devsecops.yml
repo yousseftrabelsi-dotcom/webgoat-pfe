@@ -15,8 +15,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  vulnerability-scan:
+  sast-scan:
     needs: secrets-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Très important pour que Sonar lise tout l'historique
+      - name: Analyze with SonarCloud
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=yousseftrabelsi-dotcom
+            -Dsonar.projectKey=yousseftrabelsi-dotcom_webgoat-pfe
+            -Dsonar.java.binaries=.
+
+  vulnerability-scan:
+    needs: sast-scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
