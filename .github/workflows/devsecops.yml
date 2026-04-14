@@ -4,6 +4,7 @@ on:
     branches: [ "main" ]
 
 jobs:
+  # 1. Recherche de secrets dans le code
   secrets-scan:
     runs-on: ubuntu-latest
     steps:
@@ -15,13 +16,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # 2. Analyse statique du code (SAST)
   sast-scan:
     needs: secrets-scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Très important pour que Sonar lise tout l'historique
+          fetch-depth: 0
       - name: Analyze with SonarCloud
         uses: SonarSource/sonarcloud-github-action@master
         env:
@@ -33,6 +35,7 @@ jobs:
             -Dsonar.projectKey=yousseftrabelsi-dotcom_webgoat-pfe
             -Dsonar.java.binaries=.
 
+  # 3. Analyse des dépendances logicielles (SCA/Container)
   vulnerability-scan:
     needs: sast-scan
     runs-on: ubuntu-latest
@@ -50,8 +53,37 @@ jobs:
           name: reports
           path: trivy-results.json
 
-  ai-agent-analysis:
+  # 4. Analyse dynamique (DAST) avec OWASP ZAP
+  dast-scan:
     needs: vulnerability-scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Démarrer WebGoat via Docker
+        run: |
+          docker run -d -p 8080:8080 webgoat/webgoat
+          echo "Attente du démarrage de WebGoat (45 secondes)..."
+          sleep 45
+
+      - name: OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: 'http://localhost:8080/WebGoat'
+          format: openapi
+          fail_action: false # Ne bloque pas le pipeline si des failles sont trouvées
+
+      - name: Upload ZAP Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: zap_report.html
+
+  # 5. Analyse et résumé par Intelligence Artificielle
+  ai-agent-analysis:
+    needs: dast-scan # Modifié ici pour attendre la fin de ZAP
     if: always()
     runs-on: ubuntu-latest
     steps:
