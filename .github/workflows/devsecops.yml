@@ -8,7 +8,7 @@ permissions:
   issues: write
 
 jobs:
-  # 1. Recherche de secrets dans le code
+  # 1. Recherche de secrets dans le code (Gitleaks)
   secrets-scan:
     runs-on: ubuntu-latest
     steps:
@@ -20,7 +20,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # 2. Analyse statique du code (SAST)
+  # 2. Analyse statique du code (SonarCloud)
   sast-scan:
     needs: secrets-scan
     runs-on: ubuntu-latest
@@ -39,7 +39,7 @@ jobs:
             -Dsonar.projectKey=yousseftrabelsi-dotcom_webgoat-pfe
             -Dsonar.java.binaries=.
 
-  # 3. Analyse des dépendances logicielles (SCA)
+  # 3. Analyse des dépendances (Trivy)
   vulnerability-scan:
     needs: sast-scan
     runs-on: ubuntu-latest
@@ -50,14 +50,14 @@ jobs:
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
           trivy fs --format json --output trivy-results.json .
-      - name: Upload Report
+      - name: Upload Trivy Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: reports
           path: trivy-results.json
 
-  # 4. Analyse dynamique (DAST) avec OWASP ZAP
+  # 4. Analyse dynamique (OWASP ZAP) - FIX VERSION v0.15.0
   dast-scan:
     needs: vulnerability-scan
     runs-on: ubuntu-latest
@@ -71,24 +71,23 @@ jobs:
           echo "Attente du démarrage de WebGoat (45 secondes)..."
           sleep 45
 
-      - name: Préparer les permissions pour ZAP
+      - name: Préparer les permissions
         run: chmod 777 .
 
       - name: OWASP ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.12.0
+        uses: zaproxy/action-baseline@v0.15.0
         with:
           target: 'http://localhost:8080/WebGoat'
           fail_action: false
-          artifact_name: 'zap-report-dast' # AJOUT : On force un nom valide pour l'artefact interne de ZAP
 
       - name: Upload ZAP Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: zap-results # Changé pour éviter tout conflit de nom
+          name: zap-results
           path: report_html.html
 
-  # 5. Analyse et résumé par Intelligence Artificielle
+  # 5. Analyse par Intelligence Artificielle (Gemini)
   ai-agent-analysis:
     needs: dast-scan
     if: always()
@@ -103,22 +102,20 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - name: Install AI Tool
+      - name: Install Dependencies
         run: pip install google-genai
       - name: Run AI Agent
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python scripts/ai_analyzer.py
-          echo "=== VOICI L'ANALYSE DE L'IA ==="
-          cat ai-security-summary.txt
       - name: Upload AI Report
         uses: actions/upload-artifact@v4
         with:
           name: ai-report
           path: ai-security-summary.txt
 
-  # 6. Génération du Dashboard Global (Nouveau)
+  # 6. Génération du Dashboard Global Esthétique
   generate-dashboard:
     needs: ai-agent-analysis
     if: always()
@@ -127,7 +124,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Télécharger tous les rapports (Trivy + AI)
+      - name: Télécharger tous les artefacts (Trivy + AI + ZAP)
         uses: actions/download-artifact@v4
         with:
           path: .
@@ -141,10 +138,10 @@ jobs:
       - name: Installer Plotly
         run: pip install plotly
 
-      - name: Créer le Dashboard Interactif
+      - name: Créer le Dashboard
         run: python scripts/generate_dashboard.py
 
-      - name: Upload Global Dashboard
+      - name: Upload Final Dashboard
         uses: actions/upload-artifact@v4
         with:
           name: DevSecOps-Final-Dashboard
