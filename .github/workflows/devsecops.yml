@@ -79,12 +79,13 @@ jobs:
         with:
           target: 'http://localhost:8080/WebGoat'
           fail_action: false
+          artifact_name: 'zap-report-dast' # AJOUT : On force un nom valide pour l'artefact interne de ZAP
 
       - name: Upload ZAP Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: zap-reports
+          name: zap-results # Changé pour éviter tout conflit de nom
           path: report_html.html
 
   # 5. Analyse et résumé par Intelligence Artificielle
@@ -114,7 +115,7 @@ jobs:
       - name: Upload AI Report
         uses: actions/upload-artifact@v4
         with:
-          name: ai-report # On change le nom pour le retrouver facilement
+          name: ai-report
           path: ai-security-summary.txt
 
   # 6. Génération du Dashboard Global (Nouveau)
