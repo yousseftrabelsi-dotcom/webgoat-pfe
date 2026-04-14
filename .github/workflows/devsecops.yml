@@ -3,7 +3,6 @@ on:
   push:
     branches: [ "main" ]
 
-# OPTION A : Ajout des permissions pour permettre à ZAP de créer des issues
 permissions:
   contents: read
   issues: write
@@ -80,7 +79,6 @@ jobs:
         with:
           target: 'http://localhost:8080/WebGoat'
           fail_action: false
-          # ZAP va maintenant pouvoir utiliser les permissions 'issues: write' définies plus haut
 
       - name: Upload ZAP Report
         if: always()
@@ -96,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download Report
+      - name: Download Trivy Report
         uses: actions/download-artifact@v4
         with:
           name: reports
@@ -116,5 +114,37 @@ jobs:
       - name: Upload AI Report
         uses: actions/upload-artifact@v4
         with:
-          name: PFE-AI-Report
+          name: ai-report # On change le nom pour le retrouver facilement
           path: ai-security-summary.txt
+
+  # 6. Génération du Dashboard Global (Nouveau)
+  generate-dashboard:
+    needs: ai-agent-analysis
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Télécharger tous les rapports (Trivy + AI)
+        uses: actions/download-artifact@v4
+        with:
+          path: .
+          merge-multiple: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Installer Plotly
+        run: pip install plotly
+
+      - name: Créer le Dashboard Interactif
+        run: python scripts/generate_dashboard.py
+
+      - name: Upload Global Dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: DevSecOps-Final-Dashboard
+          path: global_security_report.html
