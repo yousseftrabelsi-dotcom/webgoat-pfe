@@ -57,7 +57,7 @@ jobs:
           name: reports
           path: trivy-results.json
 
-  # 4. Analyse dynamique (OWASP ZAP) - FIX VERSION v0.15.0
+  # 4. Analyse dynamique (OWASP ZAP)
   dast-scan:
     needs: vulnerability-scan
     runs-on: ubuntu-latest
@@ -87,9 +87,55 @@ jobs:
           name: zap-results
           path: report_html.html
 
-  # 5. Analyse par Intelligence Artificielle (Gemini)
-  ai-agent-analysis:
+  # 5. Sécurité Runtime (Falco) - NOUVEAU JOB
+  falco-scan:
     needs: dast-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Lancer Falco en mode conteneur privilégié
+        run: |
+          docker run -d --name falco --privileged \
+            -v /var/run/docker.sock:/host/var/run/docker.sock \
+            -v /dev:/host/dev \
+            -v /proc:/host/proc:ro \
+            -v /boot:/host/boot:ro \
+            -v /lib/modules:/host/lib/modules:ro \
+            -v /usr:/host/usr:ro \
+            -e FALCO_JSON_OUTPUT=true \
+            falcosecurity/falco:latest
+          echo "Attente de l'initialisation de Falco..."
+          sleep 15
+
+      - name: Démarrer WebGoat (Cible)
+        run: |
+          docker run -d --name webgoat-target -p 8080:8080 webgoat/webgoat
+          sleep 20
+          
+      - name: Simuler des attaques pour déclencher Falco
+        run: |
+          echo "Simulation d'une attaque sur WebGoat..."
+          # Simulation 1 : Tentative de lecture d'un fichier sensible
+          docker exec webgoat-target cat /etc/shadow || true
+          # Simulation 2 : Ouverture d'un shell interactif inattendu
+          docker exec webgoat-target bash -c "ls -la /root" || true
+          sleep 5
+          
+      - name: Capturer les alertes Falco
+        run: |
+          docker logs falco > falco-results.json
+          
+      - name: Upload Falco Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: falco-report
+          path: falco-results.json
+
+  # 6. Analyse par Intelligence Artificielle (Gemini)
+  ai-agent-analysis:
+    needs: falco-scan
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -115,7 +161,7 @@ jobs:
           name: ai-report
           path: ai-security-summary.txt
 
-  # 6. Génération du Dashboard Global Esthétique
+  # 7. Génération du Dashboard Global
   generate-dashboard:
     needs: ai-agent-analysis
     if: always()
@@ -124,7 +170,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Télécharger tous les artefacts (Trivy + AI + ZAP)
+      - name: Télécharger tous les artefacts
         uses: actions/download-artifact@v4
         with:
           path: .
