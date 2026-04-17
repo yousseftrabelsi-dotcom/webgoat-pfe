@@ -1,4 +1,5 @@
 import json
+import os
 import plotly.graph_objects as go
 import re
 
@@ -35,17 +36,35 @@ def generate_dashboard():
     if sum(falco_counts.values()) == 0:
         falco_counts = {"Notice": 3, "Warning": 2, "Error": 1, "Critical": 0}
 
-    # GITLEAKS (Secrets) - Extraction depuis le format SARIF
+    # GITLEAKS (Secrets) - Support dynamique du nom de fichier
     gitleaks_count = 0
-    try:
-        with open('gitleaks-report.json', 'r', encoding='utf-8') as f:
-            sarif_data = json.load(f)
-            # Navigation dans la structure SARIF : runs -> premier élément -> results
-            if "runs" in sarif_data and len(sarif_data["runs"]) > 0:
-                results = sarif_data["runs"][0].get("results", [])
-                gitleaks_count = len(results) # Compte le nombre d'alertes réelles
-    except Exception as e:
-        pass # Pas de fichier généré = pas de secrets (reste à 0)
+    gitleaks_files = ['gitleaks-results.sarif', 'results.sarif', 'gitleaks-report.json']
+    file_found = None
+    
+    for filename in gitleaks_files:
+        if os.path.exists(filename):
+            file_found = filename
+            break
+
+    if file_found:
+        try:
+            with open(file_found, 'r', encoding='utf-8') as f:
+                gitleaks_data = json.load(f)
+                
+                # Format SARIF
+                if isinstance(gitleaks_data, dict) and "runs" in gitleaks_data:
+                    if len(gitleaks_data["runs"]) > 0:
+                        results = gitleaks_data["runs"][0].get("results", [])
+                        gitleaks_count = len(results)
+                
+                # Format JSON standard
+                elif isinstance(gitleaks_data, list):
+                    gitleaks_count = len(gitleaks_data)
+                    
+        except Exception as e:
+            print(f"Info: Erreur lors de la lecture du fichier {file_found} : {e}")
+    else:
+        print("Info: Aucun fichier Gitleaks trouvé parmi les artefacts. Valeur par défaut : 0.")
 
     # IA SUMMARY
     ai_summary = "Analyse IA non disponible."
