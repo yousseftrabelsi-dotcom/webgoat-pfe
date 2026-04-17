@@ -1,146 +1,193 @@
-name: Pipeline DevSecOps PFE
-
+name: DevSecOps WebGoat Pipeline
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+
+permissions:
+  contents: read
+  issues: write
 
 jobs:
-  # 1. SAST (Analyse Statique)
-  sast-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      # Ici, tu peux ajouter ton action SonarCloud ou Semgrep
-      - name: Placeholder SAST
-        run: echo "Analyse SAST effectuée."
-
-  # 2. SECRETS (Gitleaks)
+  # 1. Recherche de secrets dans le code (Gitleaks)
   secrets-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Gitleaks Scan
+      - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
-        continue-on-error: true # Ne bloque pas le build pour pouvoir générer le dashboard
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Préparer le rapport Gitleaks
-        run: |
-          if [ -f "results.json" ]; then mv results.json gitleaks-report.json; fi
-      - name: Upload Artifact Gitleaks
-        uses: actions/upload-artifact@v4
-        with:
-          name: gitleaks-report
-          path: gitleaks-report.json
-          if-no-files-found: ignore
 
-  # 3. SCA (Dépendances)
-  sca-scan:
+  # 2. Analyse statique du code (SonarCloud)
+  sast-scan:
+    needs: secrets-scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Trivy Scan
-        uses: aquasecurity/trivy-action@master
-        continue-on-error: true
         with:
-          scan-type: 'fs'
-          format: 'json'
-          output: 'trivy-results.json'
-      - name: Upload Artifact Trivy
+          fetch-depth: 0
+      - name: Analyze with SonarCloud
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=yousseftrabelsi-dotcom
+            -Dsonar.projectKey=yousseftrabelsi-dotcom_webgoat-pfe
+            -Dsonar.java.binaries=.
+
+  # 3. Analyse des dépendances (Trivy)
+  vulnerability-scan:
+    needs: sast-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install and Run Trivy
+        continue-on-error: true
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          trivy fs --format json --output trivy-results.json .
+      - name: Upload Trivy Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: trivy-report
+          name: reports
           path: trivy-results.json
 
-  # 4. DAST (OWASP ZAP)
+  # 4. Analyse dynamique (OWASP ZAP)
   dast-scan:
+    needs: vulnerability-scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      # Déploiement temporaire de l'app pour scanner (Ex: docker run -d webgoat)
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Démarrer WebGoat via Docker
+        run: |
+          docker run -d -p 8080:8080 webgoat/webgoat
+          echo "Attente du démarrage de WebGoat (45 secondes)..."
+          sleep 45
+
+      - name: Préparer les permissions
+        run: chmod 777 .
+
       - name: OWASP ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.12.0
-        continue-on-error: true
+        uses: zaproxy/action-baseline@v0.15.0
         with:
-          target: 'https://example.com' # REMPLACE par l'URL de ton WebGoat (ex: localhost:8080)
-          format: 'json'
-      - name: Renommer le rapport ZAP pour le dashboard
-        run: cp report_json.json zap-results.json || true
-      - name: Upload Artifact ZAP
+          target: 'http://localhost:8080/WebGoat'
+          fail_action: false
+
+      - name: Upload ZAP Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: zap-report # Nom corrigé par rapport à l'erreur de ta capture d'écran
-          path: zap-results.json
-          if-no-files-found: ignore
+          name: zap-results
+          path: report_html.html
 
-  # 5. RUNTIME (Falco - Simulation pour PFE)
-  runtime-scan:
+  # 5. Sécurité Runtime (Falco) - NOUVEAU JOB
+  falco-scan:
+    needs: dast-scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Generer log Falco
+      
+      - name: Lancer Falco en mode conteneur privilégié
         run: |
-          # Simulation de détection Falco pour le dashboard
-          echo '{"priority": "Notice", "rule": "Terminal shell in container"}' > falco-results.json
-          echo '{"priority": "Critical", "rule": "Read sensitive file untrusted"}' >> falco-results.json
-      - name: Upload Artifact Falco
+          docker run -d --name falco --privileged \
+            -v /var/run/docker.sock:/host/var/run/docker.sock \
+            -v /dev:/host/dev \
+            -v /proc:/host/proc:ro \
+            -v /boot:/host/boot:ro \
+            -v /lib/modules:/host/lib/modules:ro \
+            -v /usr:/host/usr:ro \
+            -e FALCO_JSON_OUTPUT=true \
+            falcosecurity/falco:latest
+          echo "Attente de l'initialisation de Falco..."
+          sleep 15
+
+      - name: Démarrer WebGoat (Cible)
+        run: |
+          docker run -d --name webgoat-target -p 8080:8080 webgoat/webgoat
+          sleep 20
+          
+      - name: Simuler des attaques pour déclencher Falco
+        run: |
+          echo "Simulation d'une attaque sur WebGoat..."
+          # Simulation 1 : Tentative de lecture d'un fichier sensible
+          docker exec webgoat-target cat /etc/shadow || true
+          # Simulation 2 : Ouverture d'un shell interactif inattendu
+          docker exec webgoat-target bash -c "ls -la /root" || true
+          sleep 5
+          
+      - name: Capturer les alertes Falco
+        run: |
+          docker logs falco > falco-results.json
+          
+      - name: Upload Falco Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: falco-report
           path: falco-results.json
 
-  # 6. GÉNÉRATION DU DASHBOARD GLOBLAL
-  generate-dashboard:
-    needs: [sast-scan, secrets-scan, sca-scan, dast-scan, runtime-scan]
+  # 6. Analyse par Intelligence Artificielle (Gemini)
+  ai-agent-analysis:
+    needs: falco-scan
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+      - name: Download Trivy Report
+        uses: actions/download-artifact@v4
+        with:
+          name: reports
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
-          
-      - name: Install dependencies
-        run: pip install plotly pandas
+          python-version: '3.9'
+      - name: Install Dependencies
+        run: pip install google-genai
+      - name: Run AI Agent
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python scripts/ai_analyzer.py
+      - name: Upload AI Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-report
+          path: ai-security-summary.txt
 
-      # Récupération de TOUS les artefacts générés par les jobs précédents
-      - uses: actions/download-artifact@v4
-        with:
-          name: trivy-report
-          path: .
-        continue-on-error: true
-        
-      - uses: actions/download-artifact@v4
-        with:
-          name: gitleaks-report
-          path: .
-        continue-on-error: true
-        
-      - uses: actions/download-artifact@v4
-        with:
-          name: zap-report
-          path: .
-        continue-on-error: true
+  # 7. Génération du Dashboard Global
+  generate-dashboard:
+    needs: ai-agent-analysis
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
+      - name: Télécharger tous les artefacts
+        uses: actions/download-artifact@v4
         with:
-          name: falco-report
           path: .
-        continue-on-error: true
+          merge-multiple: true
 
-      # Génération du fichier AI (Si tu n'as pas l'API branchée en direct)
-      - name: Mock AI Summary
-        run: echo "Analyse DevSecOps du commit ${{ github.sha }}. Des vulnérabilités critiques ont été trouvées par Trivy. Gitleaks a audité les secrets. Falco a détecté des comportements suspects en runtime. Action requise." > ai_summary.txt
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-      - name: Générer le HTML
+      - name: Installer Plotly
+        run: pip install plotly
+
+      - name: Créer le Dashboard
         run: python scripts/generate_dashboard.py
 
-      - name: Upload Dashboard Final
+      - name: Upload Final Dashboard
         uses: actions/upload-artifact@v4
         with:
           name: DevSecOps-Final-Dashboard
