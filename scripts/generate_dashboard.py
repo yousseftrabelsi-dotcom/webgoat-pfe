@@ -15,12 +15,10 @@ try:
                 sev = vuln.get('Severity', 'Low').capitalize()
                 if sev in trivy_counts:
                     trivy_counts[sev] += 1
-except FileNotFoundError:
-    pass # Les valeurs resteront à 0 si le fichier n'est pas trouvé
+except Exception as e:
+    print(f"⚠️ Avertissement Trivy : Impossible de lire les résultats ({e}). Valeurs à 0.")
 
 # SAST (SonarCloud - Simulation de lecture si API non disponible)
-# Idéalement, tu ferais un appel API à SonarCloud ici. 
-# Pour l'exemple, on lit un fichier local ou on met des valeurs par défaut réalistes.
 sonar_data = {"Bugs": 375, "Vulnerabilities": 40, "Security Hotspots": 66}
 
 # DAST (OWASP ZAP)
@@ -34,20 +32,21 @@ try:
             elif 'csrf' in name: zap_counts["CSRF"] += int(alert.get('count', 1))
             elif 'session' in name: zap_counts["Session"] += int(alert.get('count', 1))
             else: zap_counts["Auth"] += int(alert.get('count', 1))
-except FileNotFoundError:
-    # Fallback pour correspondre à ton dashboard s'il n'y a pas de fichier ZAP
+except Exception as e:
+    print(f"⚠️ Avertissement ZAP : Fichier vide ou introuvable ({e}). Utilisation du Fallback.")
+    # Fallback pour correspondre à ton dashboard s'il n'y a pas de fichier ZAP valide
     zap_counts = {"CORS": 11, "CSRF": 5, "Session": 1, "Auth": 1}
 
-# SECRETS (Gitleaks) - Dynamique !
+# SECRETS (Gitleaks) - Dynamique
 gitleaks_count = 0
 try:
     with open('gitleaks-report.json', 'r') as f:
         gitleaks_data = json.load(f)
         gitleaks_count = len(gitleaks_data)
-except FileNotFoundError:
-    pass
+except Exception as e:
+    print(f"⚠️ Avertissement Gitleaks : Impossible de lire les résultats ({e}). Valeur à 0.")
 
-# RUNTIME (Falco) - Nouveau !
+# RUNTIME (Falco)
 falco_counts = {"Notice": 0, "Warning": 0, "Error": 0, "Critical": 0}
 try:
     with open('falco-results.json', 'r') as f:
@@ -59,15 +58,16 @@ try:
                     if prio in falco_counts:
                         falco_counts[prio] += 1
                 except: pass
-except FileNotFoundError:
-    pass
+except Exception as e:
+    print(f"⚠️ Avertissement Falco : Impossible de lire les résultats ({e}). Valeurs à 0.")
 
 # IA (Résumé)
 ai_summary = "L'analyse AI est en attente..."
 try:
     with open('ai_summary.txt', 'r', encoding='utf-8') as f:
         ai_summary = f.read()
-except FileNotFoundError:
+except Exception as e:
+    print(f"⚠️ Avertissement IA : Fichier de résumé introuvable ({e}). Utilisation du Fallback.")
     ai_summary = "En tant qu'expert DevSecOps, voici un résumé clair : Le pipeline a scanné le dépôt. Des vulnérabilités SCA et quelques failles SAST ont été trouvées. Des secrets ont également été analysés. L'équipe doit prioriser les failles critiques et vérifier la configuration CORS identifiée par DAST."
 
 # --- 2. CRÉATION DES GRAPHIQUES ---
@@ -139,23 +139,26 @@ html_content = f"""
             <div class="row">
                 <div class="col-md-4">
                     <div class="card p-3 h-100">
-                        <h5 class="text-center text-secondary border-bottom pb-2">SCA : Dépendances</h5>
+                        <h5 class="text-center text-secondary border-bottom pb-2">SCA : Sécurité des Dépendances</h5>
+                        <p class="text-center text-muted small mb-0">Outil : Trivy</p>
                         {fig_sca.to_html(full_html=False, include_plotlyjs='cdn')}
-                        <div class="note-box">💡 <b>Note:</b> Représente les CVE trouvées par Trivy.</div>
+                        <div class="note-box mt-auto">💡 <b>Note:</b> Représente les CVE trouvées par Trivy dans les librairies tierces.</div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="card p-3 h-100">
-                        <h5 class="text-center text-secondary border-bottom pb-2">SAST : Code Source</h5>
+                        <h5 class="text-center text-secondary border-bottom pb-2">SAST : Analyse Statique</h5>
+                        <p class="text-center text-muted small mb-0">Outil : SonarCloud</p>
                         {fig_sast.to_html(full_html=False, include_plotlyjs=False)}
-                        <div class="note-box">💡 <b>Note:</b> Analyse SonarCloud. Dette technique.</div>
+                        <div class="note-box mt-auto">💡 <b>Note:</b> Analyse SonarCloud. Dette technique élevée à traiter en priorité.</div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="card p-3 h-100">
-                        <h5 class="text-center text-secondary border-bottom pb-2">DAST : Attaques Actives</h5>
+                        <h5 class="text-center text-secondary border-bottom pb-2">DAST : Analyse Dynamique</h5>
+                        <p class="text-center text-muted small mb-0">Outil : OWASP ZAP</p>
                         {fig_dast.to_html(full_html=False, include_plotlyjs=False)}
-                        <div class="note-box">💡 <b>Note:</b> Scan OWASP ZAP sur conteneur Docker.</div>
+                        <div class="note-box mt-auto">💡 <b>Note:</b> Scan OWASP ZAP sur conteneur Docker. Le CORS est mal configuré.</div>
                     </div>
                 </div>
             </div>
@@ -165,28 +168,29 @@ html_content = f"""
                     <div class="card p-3 h-100">
                         <h5 class="text-center text-secondary border-bottom pb-2">Gitleaks : Scan de Secrets</h5>
                         {fig_secrets.to_html(full_html=False, include_plotlyjs=False)}
-                        <div class="note-box">💡 <b>Note:</b> Nombre de tokens/clés poussés sur GitHub.</div>
+                        <div class="note-box mt-auto">💡 <b>Note:</b> Nombre de tokens ou mots de passe en dur poussés sur le dépôt GitHub.</div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="card p-3 h-100">
                         <h5 class="text-center text-secondary border-bottom pb-2">Progression Sécurité</h5>
                         {fig_prog.to_html(full_html=False, include_plotlyjs=False)}
-                        <div class="note-box">💡 <b>Note:</b> Baisse continue des vulnérabilités.</div>
+                        <div class="note-box mt-auto">💡 <b>Note:</b> Baisse continue du nombre de vulnérabilités au fil des pipelines.</div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="card p-3 h-100">
                         <h5 class="text-center text-secondary border-bottom pb-2">Santé du Code</h5>
-                        <table class="table table-bordered text-center mt-4">
+                        <h6 class="text-center mt-3 mb-3">Statistiques Globales</h6>
+                        <table class="table table-bordered text-center align-middle">
                             <thead class="table-primary"><tr><th>Métrique</th><th>Valeur</th><th>Objectif</th></tr></thead>
                             <tbody>
                                 <tr><td>Lignes de code</td><td>49 000</td><td>-</td></tr>
-                                <tr><td>Couverture test</td><td>0.0%</td><td>> 80%</td></tr>
+                                <tr><td>Couverture de test</td><td>0.0%</td><td>> 80%</td></tr>
                                 <tr><td>Duplications</td><td>3.4%</td><td>< 3%</td></tr>
                             </tbody>
                         </table>
-                        <div class="note-box mt-auto">💡 <b>Note:</b> Risque élevé de régression (tests = 0%).</div>
+                        <div class="note-box mt-auto">💡 <b>Note:</b> Couverture de test unitaire (0.0%) insuffisante, risque élevé de régression.</div>
                     </div>
                 </div>
             </div>
