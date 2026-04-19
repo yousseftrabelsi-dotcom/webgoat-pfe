@@ -16,7 +16,9 @@ def generate_dashboard():
                     sev = vuln.get('Severity')
                     if sev in trivy_counts:
                         trivy_counts[sev] += 1
-    except: pass
+    except: 
+        pass
+        
     if sum(trivy_counts.values()) == 0:
         trivy_counts = {"Critical": 2, "High": 18, "Medium": 12, "Low": 7}
 
@@ -31,8 +33,11 @@ def generate_dashboard():
                         prio = log_data.get("priority", "Notice").capitalize()
                         if prio in falco_counts:
                             falco_counts[prio] += 1
-                    except: pass
-    except: pass
+                    except: 
+                        pass
+    except: 
+        pass
+        
     if sum(falco_counts.values()) == 0:
         falco_counts = {"Notice": 3, "Warning": 2, "Error": 1, "Critical": 0}
 
@@ -58,6 +63,13 @@ def generate_dashboard():
         try:
             with open(file_found, 'r', encoding='utf-8') as f:
                 gitleaks_data = json.load(f)
+                # On ajoute la logique pour compter les secrets (SARIF ou JSON standard)
+                if isinstance(gitleaks_data, list):
+                    gitleaks_count = len(gitleaks_data)
+                elif isinstance(gitleaks_data, dict) and 'runs' in gitleaks_data:
+                    gitleaks_count = len(gitleaks_data['runs'][0].get('results', []))
+        except Exception as e:
+            print(f"Erreur lors de la lecture de Gitleaks : {e}")
 
     # IA SUMMARY
     ai_summary = "Analyse IA non disponible."
