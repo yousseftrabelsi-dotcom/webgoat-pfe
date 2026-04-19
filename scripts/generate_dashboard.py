@@ -38,11 +38,19 @@ def generate_dashboard():
 
     # GITLEAKS (Secrets) - Support dynamique du nom de fichier
     gitleaks_count = 0
-    gitleaks_files = ['results','gitleaks-results.sarif', 'results.sarif', 'gitleaks-report.json']
+    # On ajoute les chemins incluant le dossier téléchargé par GitHub Actions
+    gitleaks_files = [
+        'gitleaks-results.sarif/results.sarif', 
+        'gitleaks-results.sarif/gitleaks.sarif',
+        'gitleaks-results.sarif', 
+        'results.sarif', 
+        'gitleaks-report.json'
+    ]
     file_found = None
-    
+
     for filename in gitleaks_files:
-        if os.path.exists(filename):
+        # IMPORTANT : On utilise isfile() pour ne pas confondre avec un dossier
+        if os.path.isfile(filename):
             file_found = filename
             break
 
@@ -50,21 +58,6 @@ def generate_dashboard():
         try:
             with open(file_found, 'r', encoding='utf-8') as f:
                 gitleaks_data = json.load(f)
-                
-                # Format SARIF
-                if isinstance(gitleaks_data, dict) and "runs" in gitleaks_data:
-                    if len(gitleaks_data["runs"]) > 0:
-                        results = gitleaks_data["runs"][0].get("results", [])
-                        gitleaks_count = len(results)
-                
-                # Format JSON standard
-                elif isinstance(gitleaks_data, list):
-                    gitleaks_count = len(gitleaks_data)
-                    
-        except Exception as e:
-            print(f"Info: Erreur lors de la lecture du fichier {file_found} : {e}")
-    else:
-        print("Info: Aucun fichier Gitleaks trouvé parmi les artefacts. Valeur par défaut : 0.")
 
     # IA SUMMARY
     ai_summary = "Analyse IA non disponible."
