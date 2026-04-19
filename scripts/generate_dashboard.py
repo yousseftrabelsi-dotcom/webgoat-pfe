@@ -38,7 +38,7 @@ def generate_dashboard():
 
     # GITLEAKS (Secrets) - Support dynamique du nom de fichier
     gitleaks_count = 0
-    gitleaks_files = ['gitleaks-results.sarif', 'results.sarif', 'gitleaks-report.json']
+    gitleaks_files = ['results','gitleaks-results.sarif', 'results.sarif', 'gitleaks-report.json']
     file_found = None
     
     for filename in gitleaks_files:
