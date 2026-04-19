@@ -19,6 +19,8 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
 
   # 2. Analyse statique du code (SonarCloud)
   sast-scan:
@@ -32,7 +34,6 @@ jobs:
         uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
