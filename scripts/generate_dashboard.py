@@ -76,10 +76,17 @@ def generate_dashboard():
     try:
         with open('ai-security-summary.txt', 'r', encoding='utf-8') as f:
             raw_text = f.read()
+            # Nettoyage du Markdown
             clean_text = re.sub(r'[*#>`-]', '', raw_text)
             clean_text = re.sub(r'\s+', ' ', clean_text).strip()
-            sentences = clean_text.split('.')
-            ai_summary = '. '.join(sentences[:3]).strip() + "..."
+            
+            # On sépare le texte par les points et on enlève les espaces vides
+            sentences = [s.strip() for s in clean_text.split('.') if s.strip()]
+            
+            # On garde uniquement les 3 premières phrases (l'introduction)
+            # Et on termine proprement par un seul point !
+            if sentences:
+                ai_summary = '. '.join(sentences[:3]) + "."
     except: 
         ai_summary = "Le modèle IA a identifié des priorités critiques sur la configuration CORS et la mise à jour des librairies obsolètes. Action requise."
 
