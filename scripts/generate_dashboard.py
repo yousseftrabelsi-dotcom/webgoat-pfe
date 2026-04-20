@@ -82,7 +82,7 @@ def generate_dashboard():
             
             # On sépare le texte par les points et on enlève les espaces vides
             sentences = [s.strip() for s in clean_text.split('.') if s.strip()]
-            
+            sentences = [s for s in sentences if not s.isdigit()]
             # On garde uniquement les 3 premières phrases (l'introduction)
             # Et on termine proprement par un seul point !
             if sentences:
