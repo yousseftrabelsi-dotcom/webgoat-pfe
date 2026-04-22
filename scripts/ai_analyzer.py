@@ -42,7 +42,7 @@ Fais une synthèse globale, claire et concise (en français) des vulnérabilité
 Organise ta réponse avec des titres clairs (utilise le format Markdown) et mets en évidence les recommandations de sécurité prioritaires à la fin.
 
 RÈGLE DE FORMATAGE STRICTE : 
-Tu dois organiser ta réponse par outil. À la fin de chaque paragraphe concernant un outil, tu DOIS obligatoirement insérer la balise correspondante sur une nouvelle ligne (exactement comme écrit ci-dessous) pour que je puisse y injecter un graphique dynamiquement :
+Tu dois organiser ta réponse par outil. À la fin de chaque paragraphe concernant un outil, tu DOIS obligatoirement insérer la balise correspondante sur une nouvelle ligne (exactement comme écrit ci-dessous) pour que je puisse y injecter un graphique dynamiquement au dessous de chaque paragraphe :
 - À la fin de la section Trivy (SCA), écris : [GRAPHIQUE_SCA]
 - À la fin de la section SonarCloud (SAST), écris : [GRAPHIQUE_SAST]
 - À la fin de la section ZAP (DAST), écris : [GRAPHIQUE_DAST]
