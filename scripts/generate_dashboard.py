@@ -1,4 +1,5 @@
 import json
+import markdown
 import os
 import plotly.graph_objects as go
 import re
@@ -72,24 +73,15 @@ def generate_dashboard():
             print(f"Erreur lors de la lecture de Gitleaks : {e}")
 
     # IA SUMMARY
-    ai_summary = "Analyse IA non disponible."
+    ai_summary_html = "<p>Analyse IA non disponible.</p>"
     try:
         with open('ai-security-summary.txt', 'r', encoding='utf-8') as f:
             raw_text = f.read()
-            # Nettoyage du Markdown
-            clean_text = re.sub(r'[*#>`-]', '', raw_text)
-            clean_text = re.sub(r'\s+', ' ', clean_text).strip()
-            
-            # On sépare le texte par les points et on enlève les espaces vides
-            sentences = [s.strip() for s in clean_text.split('.') if s.strip()]
-            sentences = [s for s in sentences if not s.isdigit()]
-            # On garde uniquement les 3 premières phrases (l'introduction)
-            # Et on termine proprement par un seul point !
-            if sentences:
-                ai_summary = '. '.join(sentences[:3]) + "."
-    except: 
-        ai_summary = "Le modèle IA a identifié des priorités critiques sur la configuration CORS et la mise à jour des librairies obsolètes. Action requise."
-
+            # On utilise la librairie pour convertir le Markdown en balises HTML
+            ai_summary_html = markdown.markdown(raw_text)
+    except Exception as e: 
+        print(f"Erreur de lecture IA : {e}")
+        ai_summary_html = "<p>Le modèle IA a identifié des priorités critiques sur la configuration CORS et la mise à jour des librairies obsolètes. Action requise.</p>"
     # --- 2. CRÉATION DES GRAPHIQUES ---
     layout_transparent = dict(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=30, b=20, l=20, r=20), height=280)
 
@@ -154,7 +146,7 @@ def generate_dashboard():
                 <div class="col-12">
                     <div class="card p-4">
                         <h4 class="fw-bold text-info border-bottom pb-2">🤖 Synthèse de l'Intelligence Artificielle</h4>
-                        <div class="ai-box">{ai_summary}</div>
+                        <div class="ai-box">{ai_summary_html}</div>
                     </div>
                 </div>
             </div>

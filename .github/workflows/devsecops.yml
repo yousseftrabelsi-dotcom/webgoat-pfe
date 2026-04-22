@@ -192,8 +192,8 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Installer Plotly
-        run: pip install plotly
+      - name: Installer depandances python
+        run: pip install plotly markdown
 
       - name: Créer le Dashboard
         run: python scripts/generate_dashboard.py
