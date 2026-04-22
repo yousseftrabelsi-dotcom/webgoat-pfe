@@ -49,7 +49,8 @@ jobs:
             -Dsonar.organization=yousseftrabelsi-dotcom
             -Dsonar.projectKey=yousseftrabelsi-dotcom_webgoat-pfe
             -Dsonar.java.binaries=.
-        - name: Fetch SonarCloud Metrics
+
+      - name: Fetch SonarCloud Metrics
         if: always()
         run: |
           curl -s -u "${{ secrets.SONAR_TOKEN }}:" \
