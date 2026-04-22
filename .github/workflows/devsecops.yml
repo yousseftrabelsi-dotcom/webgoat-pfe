@@ -145,34 +145,33 @@ jobs:
           path: falco-results.json
 
   # 6. Analyse par Intelligence Artificielle (Gemini)
- ai-agent-analysis:
+  ai-agent-analysis:
     needs: [secrets-scan, sast-scan, vulnerability-scan, dast-scan, falco-scan]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      # On télécharge TOUT ce qui a été produit
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # On télécharge TOUT à la racine pour que le script Python les trouve
       - name: Download all security reports
         uses: actions/download-artifact@v4
         with:
-          path: security-reports
+          path: ./
           merge-multiple: true
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-          
-      - name: Install Dependencies
+
+      - name: Install Gemini Client
         run: pip install google-genai
-        
-      - name: Run AI Agent
+
+      - name: Run Global AI Analysis
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          # On lance le script qui va lire tous les fichiers dans 'security-reports'
-          python scripts/ai_analyzer.py
+        run: python scripts/ai_analyzer.py
     
   # 7. Génération du Dashboard Global
   generate-dashboard:
