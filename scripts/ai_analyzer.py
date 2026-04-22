@@ -40,6 +40,16 @@ Données des rapports :
 Ta mission :
 Fais une synthèse globale, claire et concise (en français) des vulnérabilités trouvées en corrélant les résultats de ces différents outils (SCA, DAST, Secrets, Runtime). 
 Organise ta réponse avec des titres clairs (utilise le format Markdown) et mets en évidence les recommandations de sécurité prioritaires à la fin.
+
+RÈGLE DE FORMATAGE STRICTE : 
+Tu dois organiser ta réponse par outil. À la fin de chaque paragraphe concernant un outil, tu DOIS obligatoirement insérer la balise correspondante sur une nouvelle ligne (exactement comme écrit ci-dessous) pour que je puisse y injecter un graphique dynamiquement :
+- À la fin de la section Trivy (SCA), écris : [GRAPHIQUE_SCA]
+- À la fin de la section SonarCloud (SAST), écris : [GRAPHIQUE_SAST]
+- À la fin de la section ZAP (DAST), écris : [GRAPHIQUE_DAST]
+- À la fin de la section Gitleaks (Secrets), écris : [GRAPHIQUE_SECRETS]
+- À la fin de la section Falco (Runtime), écris : [GRAPHIQUE_FALCO]
+
+Mets en évidence les recommandations prioritaires à la fin.
 """
 
 import time # N'oublie pas d'ajouter ça tout en haut de ton fichier avec les autres imports si ce n'est pas fait !

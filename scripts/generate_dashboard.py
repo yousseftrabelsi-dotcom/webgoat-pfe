@@ -24,6 +24,7 @@ def generate_dashboard():
                         sonar_hotspots = int(measure['value'])
     except Exception as e:
         print(f"Erreur lors de la lecture de SonarCloud : {e}")
+        
     # TRIVY (SCA)
     trivy_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
     try:
@@ -86,18 +87,6 @@ def generate_dashboard():
         except Exception as e:
             print(f"Erreur lors de la lecture de Gitleaks : {e}")
 
-    # IA SUMMARY - Lecture de la synthèse globale (SCA, DAST, Runtime, Secrets)
-    ai_summary_html = "<p>Analyse IA non disponible. Vérifiez que le job ai-agent-analysis s'est bien terminé.</p>"
-    if os.path.exists('ai-security-summary.txt'):
-        try:
-            with open('ai-security-summary.txt', 'r', encoding='utf-8') as f:
-                raw_text = f.read()
-                # Conversion du Markdown de Gemini en HTML pour le dashboard
-                ai_summary_html = markdown.markdown(raw_text)
-        except Exception as e: 
-            print(f"Erreur de lecture IA : {e}")
-            ai_summary_html = f"<p class='text-danger'>Erreur lors du traitement du rapport IA : {e}</p>"
-
     # --- 2. CRÉATION DES GRAPHIQUES ---
     layout_transparent = dict(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=30, b=20, l=20, r=20), height=280)
 
@@ -140,7 +129,36 @@ def generate_dashboard():
     fig_trend = go.Figure(data=[go.Scatter(x=['Scan 1', 'Scan 2', 'Scan 3', 'Actuel'], y=[120, 95, 60, 40], mode='lines+markers+text', line=dict(color='#2E7D32', width=4), marker=dict(size=10))])
     fig_trend.update_layout(**layout_transparent, title_text="Réduction des failles", title_x=0.5)
 
-    # --- 3. HTML & BOOTSTRAP ---
+    # --- 3. PRÉPARATION DES GRAPHIQUES POUR L'INJECTION IA (NOUVEAU) ---
+    html_sca = fig_sca.to_html(full_html=False, include_plotlyjs=False)
+    html_sast = fig_sast.to_html(full_html=False, include_plotlyjs=False)
+    html_dast = fig_dast.to_html(full_html=False, include_plotlyjs=False)
+    html_falco = fig_falco.to_html(full_html=False, include_plotlyjs=False)
+    html_secrets = fig_secrets.to_html(full_html=False, include_plotlyjs=False)
+
+    # --- 4. IA SUMMARY - Lecture et Injection ---
+    ai_summary_html = "<p>Analyse IA non disponible. Vérifiez que le job ai-agent-analysis s'est bien terminé.</p>"
+    if os.path.exists('ai-security-summary.txt'):
+        try:
+            with open('ai-security-summary.txt', 'r', encoding='utf-8') as f:
+                raw_text = f.read()
+                # Conversion du Markdown de Gemini en HTML pour le dashboard
+                ai_summary_html = markdown.markdown(raw_text)
+                
+                # NOUVEAU : Remplacement des balises par les graphiques
+                # On met une petite marge pour aérer le texte
+                graph_wrapper = '<div style="margin: 25px auto; max-width: 800px; padding: 10px; background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">{}</div>'
+                ai_summary_html = ai_summary_html.replace('[GRAPHIQUE_SCA]', graph_wrapper.format(html_sca))
+                ai_summary_html = ai_summary_html.replace('[GRAPHIQUE_SAST]', graph_wrapper.format(html_sast))
+                ai_summary_html = ai_summary_html.replace('[GRAPHIQUE_DAST]', graph_wrapper.format(html_dast))
+                ai_summary_html = ai_summary_html.replace('[GRAPHIQUE_SECRETS]', graph_wrapper.format(html_secrets))
+                ai_summary_html = ai_summary_html.replace('[GRAPHIQUE_FALCO]', graph_wrapper.format(html_falco))
+                
+        except Exception as e: 
+            print(f"Erreur de lecture IA : {e}")
+            ai_summary_html = f"<p class='text-danger'>Erreur lors du traitement du rapport IA : {e}</p>"
+
+    # --- 5. HTML & BOOTSTRAP (Ton ancien design conservé intact) ---
     html_content = f"""
     <!DOCTYPE html>
     <html lang="fr">
