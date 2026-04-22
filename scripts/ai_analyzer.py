@@ -1,4 +1,5 @@
 import os
+import time
 from google import genai
 
 print("Démarrage de l'analyse IA corrélée...")
@@ -23,8 +24,9 @@ for outil, fichier in fichiers_rapports.items():
         try:
             with open(fichier, 'r', encoding='utf-8') as f:
                 contenu = f.read()
-                # On limite volontairement la taille (ex: HTML ZAP trop lourd)
-                contexte_global += f"\n\n=== RÉSULTATS {outil.upper()} ===\n{contenu[:60000]}\n"
+                # CORRECTION : On réduit drastiquement la limite à 10 000 caractères
+                # pour éviter de surcharger l'API avec du code HTML/JSON inutile
+                contexte_global += f"\n\n=== RÉSULTATS {outil.upper()} ===\n{contenu[:10000]}\n"
         except Exception as e:
             print(f"Erreur lors de la lecture de {fichier}: {e}")
     else:
@@ -32,14 +34,14 @@ for outil, fichier in fichiers_rapports.items():
 
 # 3. Le nouveau Prompt Global
 prompt = f"""
-Tu es un expert DevSecOps. Voici plusieurs rapports de sécurité générés par différents outils dans notre pipeline CI/CD. 
+Tu es un expert DevSecOps. Voici plusieurs extraits de rapports de sécurité générés par différents outils dans notre pipeline CI/CD. 
 
 Données des rapports :
 {contexte_global}
 
 Ta mission :
 Fais une synthèse globale, claire et concise (en français) des vulnérabilités trouvées en corrélant les résultats de ces différents outils (SCA, DAST, Secrets, Runtime). 
-Organise ta réponse avec des titres clairs (utilise le format Markdown) et mets en évidence les recommandations de sécurité prioritaires à la fin.
+Organise ta réponse avec des titres clairs (utilise le format Markdown) et mets en évidence les recommandations de sécurité prioritaires à la fin. Ne génère pas de faux positifs si le rapport est vide ou tronqué.
 
 RÈGLE DE FORMATAGE STRICTE : 
 Tu dois organiser ta réponse par outil. À la fin de chaque paragraphe concernant un outil, tu DOIS obligatoirement insérer la balise correspondante sur une nouvelle ligne (exactement comme écrit ci-dessous) pour que je puisse y injecter un graphique dynamiquement au dessous de chaque paragraphe :
@@ -52,15 +54,14 @@ Tu dois organiser ta réponse par outil. À la fin de chaque paragraphe concerna
 Mets en évidence les recommandations prioritaires à la fin.
 """
 
-import time # N'oublie pas d'ajouter ça tout en haut de ton fichier avec les autres imports si ce n'est pas fait !
-
 print("Envoi des données à Gemini...")
 max_tentatives = 3
 
 for tentative in range(max_tentatives):
     try:
+        # CORRECTION : Utilisation du modèle 1.5-flash (très stable et rapide)
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-1.5-flash',
             contents=prompt
         )
 
@@ -73,8 +74,9 @@ for tentative in range(max_tentatives):
     except Exception as e:
         print(f"Erreur API Gemini (Tentative {tentative + 1}/{max_tentatives}) : {e}")
         if tentative < max_tentatives - 1:
-            print("L'API est surchargée. Attente de 15 secondes avant de réessayer...")
-            time.sleep(15) # Attendre 15s avant de refaire un appel
+            # CORRECTION : On augmente le temps de pause à 20 secondes pour laisser respirer l'API
+            print("L'API est surchargée ou la requête est trop lourde. Attente de 20 secondes avant de réessayer...")
+            time.sleep(20) 
         else:
             # Si ça échoue 3 fois de suite, on écrit l'erreur dans le rapport
             with open('ai-security-summary.txt', 'w', encoding='utf-8') as f:
