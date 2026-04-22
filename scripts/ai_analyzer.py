@@ -61,7 +61,7 @@ for tentative in range(max_tentatives):
     try:
         # CORRECTION : Utilisation du modèle 1.5-flash (très stable et rapide)
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.5-flash',
             contents=prompt
         )
 
