@@ -42,19 +42,30 @@ Fais une synthèse globale, claire et concise (en français) des vulnérabilité
 Organise ta réponse avec des titres clairs (utilise le format Markdown) et mets en évidence les recommandations de sécurité prioritaires à la fin.
 """
 
+import time # N'oublie pas d'ajouter ça tout en haut de ton fichier avec les autres imports si ce n'est pas fait !
+
 print("Envoi des données à Gemini...")
-try:
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=prompt
-    )
+max_tentatives = 3
 
-    # 4. Sauvegarde
-    with open('ai-security-summary.txt', 'w', encoding='utf-8') as f:
-        f.write(response.text)
-    print("Analyse IA terminée et sauvegardée avec succès !")
+for tentative in range(max_tentatives):
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
 
-except Exception as e:
-    print(f"Erreur lors de l'appel à l'API Gemini : {e}")
-    with open('ai-security-summary.txt', 'w', encoding='utf-8') as f:
-        f.write(f"Erreur lors de la génération de l'analyse IA : {str(e)}")
+        # 4. Sauvegarde
+        with open('ai-security-summary.txt', 'w', encoding='utf-8') as f:
+            f.write(response.text)
+        print("Analyse IA terminée et sauvegardée avec succès !")
+        break # Succès ! On sort de la boucle de tentatives
+
+    except Exception as e:
+        print(f"Erreur API Gemini (Tentative {tentative + 1}/{max_tentatives}) : {e}")
+        if tentative < max_tentatives - 1:
+            print("L'API est surchargée. Attente de 15 secondes avant de réessayer...")
+            time.sleep(15) # Attendre 15s avant de refaire un appel
+        else:
+            # Si ça échoue 3 fois de suite, on écrit l'erreur dans le rapport
+            with open('ai-security-summary.txt', 'w', encoding='utf-8') as f:
+                f.write(f"Échec de l'IA après {max_tentatives} tentatives. Serveurs indisponibles.\nErreur: {str(e)}")
