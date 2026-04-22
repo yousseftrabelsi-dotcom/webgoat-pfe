@@ -172,7 +172,12 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scripts/ai_analyzer.py
-    
+
+      - name: Upload AI Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-report
+          path: ai-security-summary.txt
   # 7. Génération du Dashboard Global
   generate-dashboard:
     needs: ai-agent-analysis
