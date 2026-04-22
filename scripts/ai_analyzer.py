@@ -7,6 +7,7 @@ client = genai.Client()
 
 # 1. Dictionnaire de tous les rapports attendus du pipeline
 fichiers_rapports = {
+    "SonarCloud (SAST - Qualité du code)": "sonar-results.json",
     "Trivy (SCA - Dépendances)": "trivy-results.json",
     "Gitleaks (Recherche de Secrets)": "results.sarif",
     "ZAP (DAST - Analyse Dynamique)": "report_html.html",

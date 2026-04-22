@@ -49,6 +49,19 @@ jobs:
             -Dsonar.organization=yousseftrabelsi-dotcom
             -Dsonar.projectKey=yousseftrabelsi-dotcom_webgoat-pfe
             -Dsonar.java.binaries=.
+        - name: Fetch SonarCloud Metrics
+        if: always()
+        run: |
+          curl -s -u "${{ secrets.SONAR_TOKEN }}:" \
+          "https://sonarcloud.io/api/measures/component?component=yousseftrabelsi-dotcom_webgoat-pfe&metricKeys=bugs,vulnerabilities,security_hotspots,code_smells" \
+          > sonar-results.json
+
+      - name: Upload Sonar Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonar-results
+          path: sonar-results.json
 
   # 3. Analyse des dépendances (Trivy)
   vulnerability-scan:

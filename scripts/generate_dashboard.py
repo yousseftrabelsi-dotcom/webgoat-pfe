@@ -5,7 +5,25 @@ import plotly.graph_objects as go
 
 def generate_dashboard():
     # --- 1. COLLECTE DES DONNÉES ---
-    
+    # SONARCLOUD (SAST) - Données dynamiques
+    sonar_bugs = 0
+    sonar_vulns = 0
+    sonar_hotspots = 0
+
+    try:
+        if os.path.exists('sonar-results.json'):
+            with open('sonar-results.json', 'r', encoding='utf-8') as f:
+                sonar_data = json.load(f)
+                measures = sonar_data.get('component', {}).get('measures', [])
+                for measure in measures:
+                    if measure['metric'] == 'bugs':
+                        sonar_bugs = int(measure['value'])
+                    elif measure['metric'] == 'vulnerabilities':
+                        sonar_vulns = int(measure['value'])
+                    elif measure['metric'] == 'security_hotspots':
+                        sonar_hotspots = int(measure['value'])
+    except Exception as e:
+        print(f"Erreur lors de la lecture de SonarCloud : {e}")
     # TRIVY (SCA)
     trivy_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
     try:
@@ -87,8 +105,14 @@ def generate_dashboard():
     fig_sca = go.Figure(data=[go.Pie(labels=list(trivy_counts.keys()), values=list(trivy_counts.values()), hole=.4, marker=dict(colors=['#d32f2f', '#f57c00', '#fbc02d', '#388e3c']))])
     fig_sca.update_layout(**layout_transparent, title_text="Vulnérabilités par Sévérité", title_x=0.5)
 
-    # 2. SAST
-    fig_sast = go.Figure(data=[go.Bar(x=['Bugs', 'Vulnerabilités', 'Hotspots'], y=[375, 40, 66], marker_color=['#1976D2', '#D32F2F', '#FFA000'], text=[375, 40, 66], textposition='auto')])
+    # 2. SAST (Dynamique avec les vraies données)
+    fig_sast = go.Figure(data=[go.Bar(
+        x=['Bugs', 'Vulnérabilités', 'Hotspots'], 
+        y=[sonar_bugs, sonar_vulns, sonar_hotspots], 
+        marker_color=['#1976D2', '#D32F2F', '#FFA000'], 
+        text=[sonar_bugs, sonar_vulns, sonar_hotspots], 
+        textposition='auto'
+    )])
     fig_sast.update_layout(**layout_transparent, title_text="Problèmes de Code Statique", title_x=0.5)
 
     # 3. DAST
