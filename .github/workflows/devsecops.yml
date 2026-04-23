@@ -157,37 +157,42 @@ jobs:
           curl -fsSL https://falco.org/repo/falcosecurity-packages.asc | sudo gpg --dearmor -o /usr/share/keyrings/falco-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/falco-archive-keyring.gpg] https://download.falco.org/packages/deb stable main" | sudo tee /etc/apt/sources.list.d/falcosecurity.list
           sudo apt-get update -y
-          # Installation silencieuse
           sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y falco linux-headers-$(uname -r)
 
       - name: Run Falco (Real Runtime)
         run: |
-          echo "Démarrage de Falco avec le driver modern_ebpf..."
-          # Lancement en arrière-plan, configuration en JSON pur, écriture dans un log brut
-          sudo falco -o engine.kind=modern_ebpf -o json_output=true > falco-raw.log 2>&1 &
+          echo "Démarrage de Falco (version 0.36.x)..."
           
-          # On laisse 15 secondes au moteur eBPF pour se greffer au noyau Linux
+          # Essai 1 : Mode Modern eBPF avec le flag -M
+          sudo falco -M -o json_output=true > falco-raw.log 2>&1 &
           sleep 15
+          
+          # Vérification si Falco a planté. Si oui, on déclenche le plan B.
+          if ! pgrep falco > /dev/null; then
+            echo "::warning::Le mode Modern eBPF (-M) a échoué. Essai avec le mode eBPF standard (-b)..."
+            sudo falco -b -o json_output=true > falco-raw.log 2>&1 &
+            sleep 15
+          fi
 
       - name: Trigger Real System Alerts
         run: |
           echo "Exécution de commandes suspectes sur le système hôte..."
-          
-          # 1. Règle "Read sensitive file untrusted"
+          # Règle : Read sensitive file untrusted
           sudo cat /etc/shadow > /dev/null || true
           
-          # 2. Règle "Write below binary dir"
+          # Règle : Write below binary dir
           sudo touch /bin/hacked_file || true
           sudo rm /bin/hacked_file || true
           
-          # 3. Règle "Launch package management process"
+          # Règle : Launch package management process
           sudo apt-get install -y netcat-openbsd || true
           
-          # On laisse le temps à Falco d'écrire les logs
+          # On laisse 10 secondes à Falco pour écrire les alertes dans le log
           sleep 10
           
           # On arrête Falco proprement
           sudo pkill falco || true
+          sleep 2
 
       - name: Format Falco Report
         run: |
@@ -200,7 +205,8 @@ jobs:
           if [ "${ALERT_COUNT}" -gt 0 ]; then
             echo "::warning::Le vrai Falco a détecté ${ALERT_COUNT} événement(s) système."
           else
-            echo "::error::Aucune alerte capturée (vérifier les logs bruts)."
+            echo "::error::Aucune alerte capturée. Voici les logs bruts pour débugger :"
+            cat falco-raw.log
           fi
 
       - name: Upload Falco Report
@@ -208,8 +214,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: report-falco
-          path: falco-results.json
-  
+          path: falco-results.json  
   # ═══════════════════════════════════════════════════════════════════
   # PHASE 3a — Analyse IA (lit TOUS les rapports des 5 outils)
   # ═══════════════════════════════════════════════════════════════════
