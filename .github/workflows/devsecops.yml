@@ -176,17 +176,21 @@ jobs:
 
       - name: Trigger Real System Alerts
         run: |
-          echo "Lancement du Falco Event Generator avec toutes les attaques..."
+          echo "Génération d'intrusions réelles via des conteneurs éphémères..."
           
-          # On utilise le flag --all comme demandé par l'outil
-          docker run --rm falcosecurity/event-generator run --all
+          # 1. Règle "Launch Package Management Process in Container" (Notice/Warning)
+          docker run --rm ubuntu apt-get update
           
-          # Filet de sécurité : attaques manuelles directes
-          sudo cat /etc/shadow > /dev/null || true
-          sudo touch /bin/hacked_system_file || true
-          sudo rm /bin/hacked_system_file || true
+          # 2. Règle "Read sensitive file untrusted" (Warning)
+          docker run --rm ubuntu cat /etc/shadow || true
           
-          # On laisse 10 secondes à Falco pour digérer et écrire les alertes
+          # 3. Règle "Write below binary dir" (Error/Critical)
+          docker run --rm ubuntu touch /bin/malicious_payload || true
+          
+          # 4. Règle "Run shell untrusted" (Notice/Critical)
+          docker run --rm alpine sh -c "echo 'Je suis un hacker'"
+          
+          echo "On laisse 10 secondes à Falco pour écrire les alertes..."
           sleep 10
           
           # On arrête Falco proprement
