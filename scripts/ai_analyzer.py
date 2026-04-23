@@ -1,80 +1,135 @@
 import os
 from google import genai
- 
+
 print("Démarrage de l'analyse IA corrélée (tous les outils)...")
- 
-client = genai.Client()
- 
-# 1. Dictionnaire de tous les rapports attendus du pipeline
+
+
+def find_report_path(filename: str) -> str | None:
+    if os.path.isfile(filename):
+        return filename
+    for root, _, files in os.walk("."):
+        if filename in files:
+            return os.path.join(root, filename)
+    return None
+
+
+def ensure_graph_tags(text: str) -> str:
+    required_tags = [
+        "[GRAPHIQUE_SCA]",
+        "[GRAPHIQUE_SAST]",
+        "[GRAPHIQUE_DAST]",
+        "[GRAPHIQUE_SECRETS]",
+        "[GRAPHIQUE_FALCO]",
+    ]
+    missing = [tag for tag in required_tags if tag not in text]
+    if not missing:
+        return text
+
+    text = text.rstrip() + "\n\n## Visualisations associées\n"
+    for tag in missing:
+        text += f"\n{tag}\n"
+    return text
+
+
+api_key = os.environ.get("GEMINI_API_KEY")
+if not api_key:
+    msg = (
+        "## Analyse IA indisponible\n"
+        "La variable GEMINI_API_KEY est absente."
+        "\n\n[GRAPHIQUE_SCA]\n\n[GRAPHIQUE_SAST]\n\n[GRAPHIQUE_DAST]"
+        "\n\n[GRAPHIQUE_SECRETS]\n\n[GRAPHIQUE_FALCO]"
+    )
+    with open("ai-security-summary.txt", "w", encoding="utf-8") as f:
+        f.write(msg)
+    print("[WARN] GEMINI_API_KEY absente — fichier fallback généré.")
+    raise SystemExit(0)
+
+client = genai.Client(api_key=api_key)
+
+# Dictionnaire des rapports attendus du pipeline
 fichiers_rapports = {
-    "Trivy (SCA - Dépendances)":          "trivy-results.json",
-    "Gitleaks (Recherche de Secrets)":     "results.sarif",
-    "ZAP (DAST - Analyse Dynamique)":      "report_html.html",
-    "Falco (Sécurité Runtime)":            "falco-results.json",
+    "Trivy (SCA - Dépendances)": "trivy-results.json",
+    "SonarCloud (SAST - Code)": "sonar-results.json",
+    "Gitleaks (Recherche de Secrets)": "results.sarif",
+    "ZAP (DAST - Analyse Dynamique)": "report_html.html",
+    "Falco (Sécurité Runtime)": "falco-results.json",
 }
- 
+
 contexte_global = ""
- 
-# 2. Lecture dynamique de tous les fichiers existants
 for outil, fichier in fichiers_rapports.items():
-    if os.path.exists(fichier):
-        print(f"-> Intégration du rapport : {outil}...")
+    located = find_report_path(fichier)
+    if located:
+        print(f"-> Intégration du rapport : {outil} ({located})...")
         try:
-            with open(fichier, "r", encoding="utf-8") as f:
+            with open(located, "r", encoding="utf-8", errors="ignore") as f:
                 contenu = f.read()
-            # On limite la taille pour ne pas dépasser le contexte Gemini
-            contexte_global += (
-                f"\n\n=== RÉSULTATS {outil.upper()} ===\n{contenu[:50000]}\n"
-            )
+            contexte_global += f"\n\n=== RÉSULTATS {outil.upper()} ===\n{contenu[:30000]}\n"
         except Exception as e:
-            print(f"  Erreur lecture {fichier}: {e}")
+            print(f"  Erreur lecture {located}: {e}")
     else:
         print(f"-> Rapport {outil} introuvable (ignoré).")
- 
+
 if not contexte_global.strip():
     msg = (
-        "Aucun rapport de sécurité n'a été trouvé dans le répertoire courant. "
-        "Vérifiez que les artefacts ont bien été téléchargés avant ce job."
+        "## Aucun rapport exploitable\n"
+        "Aucun rapport de sécurité n'a été trouvé dans le répertoire courant ou ses sous-dossiers."
+        " Vérifiez que les artefacts ont bien été téléchargés avant ce job."
+        "\n\n[GRAPHIQUE_SCA]\n\n[GRAPHIQUE_SAST]\n\n[GRAPHIQUE_DAST]"
+        "\n\n[GRAPHIQUE_SECRETS]\n\n[GRAPHIQUE_FALCO]"
     )
     print(f"[WARN] {msg}")
     with open("ai-security-summary.txt", "w", encoding="utf-8") as f:
         f.write(msg)
     raise SystemExit(0)
- 
-# 3. Prompt avec règle d'injection des balises graphiques
+
 prompt = f"""
-Tu es un expert DevSecOps senior. Voici les rapports de sécurité générés par notre pipeline CI/CD
-pour le projet WebGoat :
- 
+Tu es un expert DevSecOps senior.
+Voici les rapports de sécurité générés par notre pipeline CI/CD pour le projet WebGoat :
+
 {contexte_global}
- 
+
 Ta mission :
-Fais une synthèse globale, claire et concise (en français) en corrélant les résultats de tous
-les outils (SCA, DAST, Secrets, Runtime). Utilise le format Markdown avec des titres clairs (##).
- 
-RÈGLE DE FORMATAGE STRICTE — À respecter impérativement :
-Après chaque section dédiée à un outil, insère la balise correspondante sur une ligne séparée
-(exactement comme écrit, sans espace ni modification) :
- 
-- Après la section Trivy / SCA      → [GRAPHIQUE_SCA]
-- Après la section SonarCloud / SAST → [GRAPHIQUE_SAST]
-- Après la section ZAP / DAST       → [GRAPHIQUE_DAST]
-- Après la section Gitleaks / Secrets → [GRAPHIQUE_SECRETS]
-- Après la section Falco / Runtime  → [GRAPHIQUE_FALCO]
- 
-Termine toujours par une section ## Recommandations Prioritaires listant les actions urgentes.
+1. Produis une synthèse globale claire, concise et professionnelle en français.
+2. Corrèle les résultats SCA, SAST, DAST, Secrets et Runtime.
+3. Pour chaque section, indique brièvement : le constat, l'impact, puis l'action recommandée.
+4. Si une source manque, précise explicitement que les données sont indisponibles.
+5. Termine par une section ## Recommandations Prioritaires avec les actions les plus urgentes.
+
+Format obligatoire :
+- ## Dépendances (Trivy)
+- ## Code Statique (SonarCloud)
+- ## Attaques Web (ZAP)
+- ## Secrets Git (Gitleaks)
+- ## Runtime (Falco)
+- ## Recommandations Prioritaires
+
+RÈGLE DE FORMATAGE STRICTE :
+Insère exactement la balise demandée sur sa propre ligne à la fin de chaque section :
+- Après Dépendances (Trivy)       => [GRAPHIQUE_SCA]
+- Après Code Statique (SonarCloud) => [GRAPHIQUE_SAST]
+- Après Attaques Web (ZAP)         => [GRAPHIQUE_DAST]
+- Après Secrets Git (Gitleaks)     => [GRAPHIQUE_SECRETS]
+- Après Runtime (Falco)            => [GRAPHIQUE_FALCO]
 """
- 
+
 print("Envoi des données à Gemini...")
 try:
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=prompt,
     )
+    text = response.text if getattr(response, "text", None) else "## Analyse IA indisponible"
+    text = ensure_graph_tags(text)
     with open("ai-security-summary.txt", "w", encoding="utf-8") as f:
-        f.write(response.text)
+        f.write(text)
     print("Analyse IA terminée et sauvegardée avec succès !")
 except Exception as e:
     print(f"Erreur lors de l'appel à l'API Gemini : {e}")
+    fallback = (
+        "## Erreur lors de la génération IA\n"
+        f"{e}"
+        "\n\n[GRAPHIQUE_SCA]\n\n[GRAPHIQUE_SAST]\n\n[GRAPHIQUE_DAST]"
+        "\n\n[GRAPHIQUE_SECRETS]\n\n[GRAPHIQUE_FALCO]"
+    )
     with open("ai-security-summary.txt", "w", encoding="utf-8") as f:
-        f.write(f"Erreur lors de la génération de l'analyse IA : {e}")
+        f.write(fallback)
