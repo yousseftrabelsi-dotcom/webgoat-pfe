@@ -506,5 +506,5 @@ def generate_dashboard():
     print(f"[OK] Dashboard généré : {output_path}")
 
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     generate_dashboard()
