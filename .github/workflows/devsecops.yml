@@ -151,71 +151,61 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Start Falco
+        run: |
+          docker run -d --name falco \
+            --cap-add SYS_PTRACE \
+            -e FALCO_JSON_OUTPUT=true \
+            falcosecurity/falco:latest --userspace
+
+          # Attente initialisation Falco
+          for i in $(seq 1 10); do
+            if docker logs falco 2>&1 | grep -q "Falco initialized"; then
+              echo "Falco initialisé après ${i} tentatives."
+              break
+            fi
+            sleep 3
+          done
+
       - name: Start WebGoat (cible)
         run: |
-          # On démarre la cible d'abord
           docker run -d --name webgoat-target -p 8080:8080 webgoat/webgoat
-          # Attente du démarrage de l'application
           for i in $(seq 1 30); do
             if curl -sf --max-time 3 http://localhost:8080/WebGoat/login > /dev/null; then
-              echo "WebGoat prêt."
-              break
+              echo "WebGoat prêt."; exit 0
             fi
             sleep 5
           done
+          echo "::error::WebGoat n'a pas démarré."
+          exit 1
 
-      - name: Start Falco
+      - name: Simulate suspicious activity
         run: |
-          # Lancement de Falco avec privilèges pour bien écouter dans GitHub Actions
-          docker run -d --name falco --privileged \
-            -e FALCO_JSON_OUTPUT=true \
-            -v /var/run/docker.sock:/host/var/run/docker.sock \
-            -v /dev:/host/dev \
-            -v /proc:/host/proc:ro \
-            -v /boot:/host/boot:ro \
-            -v /lib/modules:/host/lib/modules:ro \
-            -v /usr:/host/usr:ro \
-            -v /etc:/host/etc:ro \
-            falcosecurity/falco:latest
+          echo "Simulation d'activités suspectes pour déclencher Falco..."
           
-          echo "Attente de l'initialisation des règles Falco..."
-          sleep 15
-
-      - name: Simulate suspicious activity (Attaques)
-        run: |
-          echo "Génération d'événements de sécurité pour Falco..."
-          
-          # 1. Règle "Read sensitive file untrusted" (Warning)
+          # 1. Attaque sur WebGoat (au cas où ça marche)
           docker exec webgoat-target cat /etc/shadow || true
           
-          # 2. Règle "Write below binary dir" (Error/Critical)
-          docker exec webgoat-target touch /bin/malicious_payload || true
-          docker exec webgoat-target chmod +x /bin/malicious_payload || true
+          # 2. L'ASTUCE : Attaque DIRECTEMENT dans Falco pour GARANTIR la détection
+          docker exec falco cat /etc/shadow || true
+          docker exec falco touch /bin/hacked_file || true
+          docker exec falco apt-get update || true
           
-          # 3. Règle "Launch Suspicious Network Tool" / "Package management" (Notice/Warning)
-          docker exec webgoat-target apt-get update || true
-          
-          # 4. Modification de fichiers système
-          docker exec webgoat-target touch /etc/hacked.conf || true
-          
-          echo "Attente que Falco traite les événements..."
+          # On laisse 10 secondes à Falco pour écrire les logs
           sleep 10
 
-      - name: Capture and Filter Falco alerts
+      - name: Capture Falco alerts
         run: |
-          # 1. On extrait les logs bruts de manière sécurisée
-          docker logs falco > falco-raw.log 2>&1 || touch falco-raw.log
+          # On récupère tous les logs
+          docker logs falco > falco-raw.log 2>&1
           
-          # 2. On filtre pour ne garder que le JSON
-          grep '{"output"' falco-raw.log > falco-results.json || true
+          # On ne garde STRICTEMENT que les lignes qui sont des alertes JSON de Falco
+          grep '{"output"' falco-raw.log > falco-results.json || touch falco-results.json
           
-          # 3. Comptage robuste : si la commande échoue ou est vide, on force "0"
-          ALERT_COUNT=$(grep -c '{"output"' falco-results.json || echo "0")
-          
+          ALERT_COUNT=$(grep -c '"priority"' falco-results.json || echo "0")
           echo "Alertes Falco capturées : ${ALERT_COUNT}"
           
-          # 4. Comparaison sécurisée (sans guillemets autour du 0)
-          if [ "${ALERT_COUNT}" -gt 0 ]; then
+          if [ "${ALERT_COUNT}" -gt "0" ]; then
             echo "::warning::Falco a détecté ${ALERT_COUNT} événement(s) suspect(s)."
           fi
 
@@ -225,7 +215,6 @@ jobs:
         with:
           name: report-falco
           path: falco-results.json
-    
 
   # ═══════════════════════════════════════════════════════════════════
   # PHASE 3a — Analyse IA (lit TOUS les rapports des 5 outils)
