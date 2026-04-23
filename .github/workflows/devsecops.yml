@@ -203,16 +203,19 @@ jobs:
 
       - name: Capture and Filter Falco alerts
         run: |
-          # On extrait les logs bruts
-          docker logs falco > falco-raw.log 2>&1
+          # 1. On extrait les logs bruts de manière sécurisée
+          docker logs falco > falco-raw.log 2>&1 || touch falco-raw.log
           
-          # On filtre pour ne garder STRICTEMENT que les lignes JSON valides de Falco
+          # 2. On filtre pour ne garder que le JSON
           grep '{"output"' falco-raw.log > falco-results.json || true
           
-          ALERT_COUNT=$(wc -l < falco-results.json)
+          # 3. Comptage robuste : si la commande échoue ou est vide, on force "0"
+          ALERT_COUNT=$(grep -c '{"output"' falco-results.json || echo "0")
+          
           echo "Alertes Falco capturées : ${ALERT_COUNT}"
           
-          if [ "${ALERT_COUNT}" -gt "0" ]; then
+          # 4. Comparaison sécurisée (sans guillemets autour du 0)
+          if [ "${ALERT_COUNT}" -gt 0 ]; then
             echo "::warning::Falco a détecté ${ALERT_COUNT} événement(s) suspect(s)."
           fi
 
