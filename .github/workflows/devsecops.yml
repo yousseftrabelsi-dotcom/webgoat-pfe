@@ -151,43 +151,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Falco Natively
+      - name: Install & Configure Falco 0.36.2
         run: |
-          echo "Installation de Falco directement sur le runner Ubuntu..."
+          echo "Installation de Falco (version spécifique 0.36.2)..."
           curl -fsSL https://falco.org/repo/falcosecurity-packages.asc | sudo gpg --dearmor -o /usr/share/keyrings/falco-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/falco-archive-keyring.gpg] https://download.falco.org/packages/deb stable main" | sudo tee /etc/apt/sources.list.d/falcosecurity.list
           sudo apt-get update -y
-          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y falco linux-headers-$(uname -r)
+          
+          # ON FORCE LA VERSION ICI
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y falco=0.36.2 linux-headers-$(uname -r)
+          
+          echo "Activation du format JSON dans la configuration officielle..."
+          # On modifie proprement le falco.yaml au lieu d'utiliser le flag -o qui plantait
+          sudo sed -i 's/json_output: false/json_output: true/' /etc/falco/falco.yaml
 
-      - name: Run Falco (Real Runtime)
+      - name: Run Falco (0.36.2)
         run: |
-          echo "Démarrage de Falco (version 0.36.x)..."
+          echo "Démarrage de Falco 0.36.2..."
+          # On utilise -b (eBPF standard) qui est le plus compatible avec les anciennes versions
+          sudo falco -b > falco-raw.log 2>&1 &
           
-          # Essai 1 : Mode Modern eBPF avec le flag -M
-          sudo falco -M -o json_output=true > falco-raw.log 2>&1 &
-          sleep 15
-          
-          # Vérification si Falco a planté. Si oui, on déclenche le plan B.
-          if ! pgrep falco > /dev/null; then
-            echo "::warning::Le mode Modern eBPF (-M) a échoué. Essai avec le mode eBPF standard (-b)..."
-            sudo falco -b -o json_output=true > falco-raw.log 2>&1 &
-            sleep 15
-          fi
+          # On laisse 10 secondes au moteur pour bien s'attacher
+          sleep 10
 
       - name: Trigger Real System Alerts
         run: |
           echo "Génération d'intrusions réelles via des conteneurs éphémères..."
           
-          # 1. Règle "Launch Package Management Process in Container" (Notice/Warning)
+          # Ces conteneurs Docker vont déclencher les règles par défaut de Falco
           docker run --rm ubuntu apt-get update
-          
-          # 2. Règle "Read sensitive file untrusted" (Warning)
           docker run --rm ubuntu cat /etc/shadow || true
-          
-          # 3. Règle "Write below binary dir" (Error/Critical)
           docker run --rm ubuntu touch /bin/malicious_payload || true
-          
-          # 4. Règle "Run shell untrusted" (Notice/Critical)
           docker run --rm alpine sh -c "echo 'Je suis un hacker'"
           
           echo "On laisse 10 secondes à Falco pour écrire les alertes..."
@@ -199,14 +193,14 @@ jobs:
 
       - name: Format Falco Report
         run: |
-          # On extrait uniquement les vraies alertes JSON générées par Falco
+          echo "Extraction des alertes JSON..."
           grep '{"output"' falco-raw.log > falco-results.json || touch falco-results.json
           
           ALERT_COUNT=$(wc -l < falco-results.json)
           echo "Alertes Falco RÉELLES capturées : ${ALERT_COUNT}"
           
           if [ "${ALERT_COUNT}" -gt 0 ]; then
-            echo "::warning::Le vrai Falco a détecté ${ALERT_COUNT} événement(s) système."
+            echo "::warning::Succès ! Falco 0.36.2 a détecté ${ALERT_COUNT} événement(s) système."
           else
             echo "::error::Aucune alerte capturée. Voici les logs bruts pour débugger :"
             cat falco-raw.log
@@ -217,7 +211,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: report-falco
-          path: falco-results.json  
+          path: falco-results.json          
   # ═══════════════════════════════════════════════════════════════════
   # PHASE 3a — Analyse IA (lit TOUS les rapports des 5 outils)
   # ═══════════════════════════════════════════════════════════════════
