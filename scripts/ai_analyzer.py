@@ -1,4 +1,3 @@
-voici mon script ai_analyzer.py,je veux integrer tous les outils: ai_analyzer.py
 import os
 from google import genai
 
