@@ -151,62 +151,56 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start Falco
+      - name: Install Falco Natively
         run: |
-          docker run -d --name falco \
-            --cap-add SYS_PTRACE \
-            -e FALCO_JSON_OUTPUT=true \
-            falcosecurity/falco:latest --userspace
+          echo "Installation de Falco directement sur le runner Ubuntu..."
+          curl -fsSL https://falco.org/repo/falcosecurity-packages.asc | sudo gpg --dearmor -o /usr/share/keyrings/falco-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/falco-archive-keyring.gpg] https://download.falco.org/packages/deb stable main" | sudo tee /etc/apt/sources.list.d/falcosecurity.list
+          sudo apt-get update -y
+          # Installation silencieuse
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y falco linux-headers-$(uname -r)
 
-          # Attente initialisation Falco
-          for i in $(seq 1 10); do
-            if docker logs falco 2>&1 | grep -q "Falco initialized"; then
-              echo "Falco initialisé après ${i} tentatives."
-              break
-            fi
-            sleep 3
-          done
-
-      - name: Start WebGoat (cible)
+      - name: Run Falco (Real Runtime)
         run: |
-          docker run -d --name webgoat-target -p 8080:8080 webgoat/webgoat
-          for i in $(seq 1 30); do
-            if curl -sf --max-time 3 http://localhost:8080/WebGoat/login > /dev/null; then
-              echo "WebGoat prêt."; exit 0
-            fi
-            sleep 5
-          done
-          echo "::error::WebGoat n'a pas démarré."
-          exit 1
+          echo "Démarrage de Falco avec le driver modern_ebpf..."
+          # Lancement en arrière-plan, configuration en JSON pur, écriture dans un log brut
+          sudo falco -o engine.kind=modern_ebpf -o json_output=true > falco-raw.log 2>&1 &
+          
+          # On laisse 15 secondes au moteur eBPF pour se greffer au noyau Linux
+          sleep 15
 
-      - name: Simulate suspicious activity
+      - name: Trigger Real System Alerts
         run: |
-          echo "Simulation d'activités suspectes pour déclencher Falco..."
+          echo "Exécution de commandes suspectes sur le système hôte..."
           
-          # 1. Attaque sur WebGoat (au cas où ça marche)
-          docker exec webgoat-target cat /etc/shadow || true
+          # 1. Règle "Read sensitive file untrusted"
+          sudo cat /etc/shadow > /dev/null || true
           
-          # 2. L'ASTUCE : Attaque DIRECTEMENT dans Falco pour GARANTIR la détection
-          docker exec falco cat /etc/shadow || true
-          docker exec falco touch /bin/hacked_file || true
-          docker exec falco apt-get update || true
+          # 2. Règle "Write below binary dir"
+          sudo touch /bin/hacked_file || true
+          sudo rm /bin/hacked_file || true
           
-          # On laisse 10 secondes à Falco pour écrire les logs
+          # 3. Règle "Launch package management process"
+          sudo apt-get install -y netcat-openbsd || true
+          
+          # On laisse le temps à Falco d'écrire les logs
           sleep 10
-
-      - name: Capture Falco alerts
-        run: |
-          # On récupère tous les logs
-          docker logs falco > falco-raw.log 2>&1
           
-          # On ne garde STRICTEMENT que les lignes qui sont des alertes JSON de Falco
+          # On arrête Falco proprement
+          sudo pkill falco || true
+
+      - name: Format Falco Report
+        run: |
+          # On extrait uniquement les vraies alertes JSON générées par Falco
           grep '{"output"' falco-raw.log > falco-results.json || touch falco-results.json
           
-          ALERT_COUNT=$(grep -c '"priority"' falco-results.json || echo "0")
-          echo "Alertes Falco capturées : ${ALERT_COUNT}"
+          ALERT_COUNT=$(wc -l < falco-results.json)
+          echo "Alertes Falco RÉELLES capturées : ${ALERT_COUNT}"
           
-          if [ "${ALERT_COUNT}" -gt "0" ]; then
-            echo "::warning::Falco a détecté ${ALERT_COUNT} événement(s) suspect(s)."
+          if [ "${ALERT_COUNT}" -gt 0 ]; then
+            echo "::warning::Le vrai Falco a détecté ${ALERT_COUNT} événement(s) système."
+          else
+            echo "::error::Aucune alerte capturée (vérifier les logs bruts)."
           fi
 
       - name: Upload Falco Report
@@ -215,7 +209,7 @@ jobs:
         with:
           name: report-falco
           path: falco-results.json
-
+  
   # ═══════════════════════════════════════════════════════════════════
   # PHASE 3a — Analyse IA (lit TOUS les rapports des 5 outils)
   # ═══════════════════════════════════════════════════════════════════
