@@ -176,10 +176,15 @@ jobs:
 
       - name: Trigger Real System Alerts
         run: |
-          echo "Lancement du Falco Event Generator pour simuler des attaques professionnelles..."
+          echo "Lancement du Falco Event Generator avec toutes les attaques..."
           
-          # On télécharge et on lance l'image officielle qui simule des attaques
-          docker run --rm falcosecurity/event-generator run syscall --loop=false
+          # On utilise le flag --all comme demandé par l'outil
+          docker run --rm falcosecurity/event-generator run --all
+          
+          # Filet de sécurité : attaques manuelles directes
+          sudo cat /etc/shadow > /dev/null || true
+          sudo touch /bin/hacked_system_file || true
+          sudo rm /bin/hacked_system_file || true
           
           # On laisse 10 secondes à Falco pour digérer et écrire les alertes
           sleep 10
