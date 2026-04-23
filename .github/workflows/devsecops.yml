@@ -322,7 +322,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install Python dependencies
-        run: pip install plotly markdown --break-system-packages
+        run: python -m pip install plotly markdown 
 
       - name: Generate Dashboard
         env:
