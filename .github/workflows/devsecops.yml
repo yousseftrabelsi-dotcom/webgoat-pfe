@@ -272,7 +272,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install google-genai plotly markdown
+        run: pip install google-genai
 
       - name: Run AI Agent
         env:
@@ -322,7 +322,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install Python dependencies
-        run: pip install plotly
+        run: pip install plotly markdown --break-system-packages
 
       - name: Generate Dashboard
         env:
