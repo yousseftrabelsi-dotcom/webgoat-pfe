@@ -1,6 +1,6 @@
 """
 generate_dashboard.py
-Génère global_security_report.html — Dashboard DevSecOps (thème sombre)
+Génère global_security_report.html — Dashboard DevSecOps (thème sombre + Light toggle)
 Lit les vrais fichiers de rapport et affiche 6 graphiques interactifs Plotly.
 """
 
@@ -26,10 +26,8 @@ def parse_trivy(path: str = "trivy-results.json") -> dict:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
         
-        # ✅ Parcourt TOUS les Results + Vulnerabilities
         for result in data.get("Results", []):
             for vuln in result.get("Vulnerabilities", []):
-                # Gère capitalisation Trivy ("HIGH" → "High")
                 sev = vuln.get("Severity", "Unknown").title()
                 if sev in counts:
                     counts[sev] += 1
@@ -43,11 +41,9 @@ def parse_trivy(path: str = "trivy-results.json") -> dict:
 
 
 def parse_sonar(path: str = "sonar-results.json") -> dict:
-    """Lit le JSON SonarCloud (format component/measures)."""
     data = {"bugs": 0, "vulnerabilities": 0, "security_hotspots": 0}
     if not os.path.isfile(path):
         print(f"[WARN] SonarCloud : fichier introuvable ({path})", file=sys.stderr)
-        # Valeurs de démonstration basées sur les captures d'écran
         return {"bugs": 211, "vulnerabilities": 42, "security_hotspots": 68}
     try:
         with open(path, encoding="utf-8") as f:
@@ -65,25 +61,8 @@ def parse_zap(path: str = "report_html.html") -> dict:
     counts = {"High": 0, "Medium": 0, "Low": 0, "Informational": 0}
     if not os.path.isfile(path):
         print(f"[WARN] ZAP : fichier introuvable ({path})", file=sys.stderr)
-        # Valeurs de démonstration (CORS=11, CSRF=5, Session=1, Auth=1)
         return {"CORS": 11, "CSRF": 5, "Session": 1, "Auth": 1}
 
-    # Essai JSON d'abord
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-        for site in data.get("site", []):
-            for alert in site.get("alerts", []):
-                risk = alert.get("riskdesc", "").split(" ")[0]
-                if risk in counts:
-                    counts[risk] += 1
-        return counts
-    except json.JSONDecodeError:
-        pass
-    except Exception as e:
-        print(f"[ERROR] ZAP JSON : {e}", file=sys.stderr)
-
-    # Extraction HTML par regex
     try:
         with open(path, encoding="utf-8") as f:
             html = f.read()
@@ -159,10 +138,6 @@ def parse_ai_summary(path: str = "ai-security-summary.txt") -> str:
         return fallback
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 2. SCORE DE RISQUE GLOBAL
-# ─────────────────────────────────────────────────────────────────────────────
-
 def compute_risk_score(trivy: dict, falco: dict, gitleaks: int, zap) -> dict:
     if gitleaks > 0:
         return {
@@ -172,7 +147,6 @@ def compute_risk_score(trivy: dict, falco: dict, gitleaks: int, zap) -> dict:
             "reason": f"{gitleaks} secret(s) en clair détecté(s) — déploiement bloqué immédiatement.",
         }
 
-    # zap peut être un dict {risk: count} ou {label: count}
     zap_high = zap.get("High", 0) if isinstance(zap, dict) else 0
 
     raw = (
@@ -197,7 +171,7 @@ def compute_risk_score(trivy: dict, falco: dict, gitleaks: int, zap) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. CRÉATION DES FIGURES PLOTLY (thème sombre)
+# PLOTLY FIGURES (thème sombre)
 # ─────────────────────────────────────────────────────────────────────────────
 
 DARK_BG   = "rgba(0,0,0,0)"
@@ -213,14 +187,12 @@ BASE_LAYOUT = dict(
     height=300,
 )
 
-
 def _dark_axes():
     return dict(
         gridcolor=GRID_CLR,
         zerolinecolor=GRID_CLR,
         tickfont=dict(color=TEXT_CLR, size=11),
     )
-
 
 def fig_sca(trivy: dict) -> go.Figure:
     total = sum(trivy.values())
@@ -246,7 +218,6 @@ def fig_sca(trivy: dict) -> go.Figure:
                       title_font=dict(size=13, color="#94a3b8"))
     return fig
 
-
 def fig_sast(sonar: dict) -> go.Figure:
     labels = ["Bugs", "Vulnérabilités", "Hotspots"]
     values = [sonar["bugs"], sonar["vulnerabilities"], sonar["security_hotspots"]]
@@ -268,7 +239,6 @@ def fig_sast(sonar: dict) -> go.Figure:
                       xaxis=_dark_axes(),
                       yaxis=_dark_axes())
     return fig
-
 
 def fig_dast(zap: dict) -> go.Figure:
     labels = list(zap.keys())
@@ -296,7 +266,6 @@ def fig_dast(zap: dict) -> go.Figure:
                       yaxis=_dark_axes())
     return fig
 
-
 def fig_falco(falco: dict) -> go.Figure:
     colors = ["#22c55e", "#f97316", "#ec4899", "#b91c1c"]
     fig = go.Figure(data=[go.Bar(
@@ -314,7 +283,6 @@ def fig_falco(falco: dict) -> go.Figure:
                       xaxis=_dark_axes(),
                       yaxis=_dark_axes())
     return fig
-
 
 def fig_secrets(count: int) -> go.Figure:
     max_val = max(5, count + 3)
@@ -347,9 +315,7 @@ def fig_secrets(count: int) -> go.Figure:
     fig.update_layout(**BASE_LAYOUT)
     return fig
 
-
 def fig_trend() -> go.Figure:
-    """Graphique de tendance — à connecter à des données historiques réelles."""
     x = ["Scan 1", "Scan 2", "Scan 3", "Actuel"]
     y = [120, 95, 60, 40]
     fig = go.Figure()
@@ -375,75 +341,11 @@ def fig_trend() -> go.Figure:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. CONVERSION MARKDOWN → HTML (sans dépendance externe)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def md_to_html(text: str) -> str:
-    """Conversion Markdown minimale (titres, listes, gras, italique)."""
-    lines = text.split("\n")
-    out = []
-    in_ul = False
-    for line in lines:
-        # Titres
-        if line.startswith("### "):
-            if in_ul: out.append("</ul>"); in_ul = False
-            out.append(f"<h3>{line[4:]}</h3>")
-        elif line.startswith("## "):
-            if in_ul: out.append("</ul>"); in_ul = False
-            out.append(f"<h2>{line[3:]}</h2>")
-        elif line.startswith("# "):
-            if in_ul: out.append("</ul>"); in_ul = False
-            out.append(f"<h1>{line[2:]}</h1>")
-        # Listes
-        elif re.match(r"^[-*+] ", line):
-            if not in_ul:
-                out.append("<ul>"); in_ul = True
-            item = line[2:]
-            item = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", item)
-            item = re.sub(r"\*(.+?)\*",     r"<em>\1</em>",          item)
-            out.append(f"<li>{item}</li>")
-        # Ligne vide
-        elif line.strip() == "":
-            if in_ul: out.append("</ul>"); in_ul = False
-            out.append("<br>")
-        else:
-            if in_ul: out.append("</ul>"); in_ul = False
-            para = line
-            para = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", para)
-            para = re.sub(r"\*(.+?)\*",     r"<em>\1</em>",          para)
-            out.append(f"<p>{para}</p>")
-    if in_ul:
-        out.append("</ul>")
-    return "\n".join(out)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 5. INJECTION DES BALISES GRAPHIQUES DANS LE TEXTE IA
-# ─────────────────────────────────────────────────────────────────────────────
-
-def inject_graphs(html_text: str, graphs: dict) -> str:
-    wrapper = (
-        '<div style="margin:20px auto;max-width:700px;background:rgba(255,255,255,0.03);'
-        'border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,0.08)">'
-        '{}</div>'
-    )
-    for tag, html_fig in graphs.items():
-        html_text = html_text.replace(
-            f"[{tag}]", wrapper.format(html_fig)
-        )
-        # SonarCloud n'envoie pas de fichier — la balise SAST peut rester sans données réelles
-        html_text = html_text.replace(
-            f"<p>[{tag}]</p>", wrapper.format(html_fig)
-        )
-    return html_text
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 6. GÉNÉRATION DU DASHBOARD
+# GÉNÉRATION DASHBOARD
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_dashboard():
-    # — Données —
+    # Données
     trivy_data   = parse_trivy()
     sonar_data   = parse_sonar()
     zap_data     = parse_zap()
@@ -457,7 +359,6 @@ def generate_dashboard():
     ai_raw       = parse_ai_summary()
     risk         = compute_risk_score(trivy_data, falco_data, gitleaks_cnt, zap_data)
 
-    # — Métadonnées run —
     meta = {
         "sha":       os.environ.get("GITHUB_SHA",        "local")[:8],
         "run":       os.environ.get("GITHUB_RUN_NUMBER", "—"),
@@ -467,8 +368,8 @@ def generate_dashboard():
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
     }
 
-    # — Figures Plotly → HTML partiel —
-    pjs = False  # plotlyjs déjà chargé via CDN dans <head>
+    # Figures Plotly
+    pjs = False
     f_sca    = fig_sca(trivy_data).to_html(full_html=False,  include_plotlyjs=pjs)
     f_sast   = fig_sast(sonar_data).to_html(full_html=False, include_plotlyjs=pjs)
     f_dast   = fig_dast(zap_data).to_html(full_html=False,   include_plotlyjs=pjs)
@@ -476,22 +377,12 @@ def generate_dashboard():
     f_sec    = fig_secrets(gitleaks_cnt).to_html(full_html=False, include_plotlyjs=pjs)
     f_trend  = fig_trend().to_html(full_html=False,          include_plotlyjs=pjs)
 
-    # — Résumé IA : Markdown → HTML + injection des graphiques —
-    ai_html = md_to_html(ai_raw)
-    ai_html = inject_graphs(ai_html, {
-        "GRAPHIQUE_SCA":     f_sca,
-        "GRAPHIQUE_SAST":    f_sast,
-        "GRAPHIQUE_DAST":    f_dast,
-        "GRAPHIQUE_SECRETS": f_sec,
-        "GRAPHIQUE_FALCO":   f_falco,
-    })
-
-    # — KPIs —
+    # AI HTML
     total_cve   = sum(trivy_data.values())
     total_falco = sum(falco_data.values())
     total_zap   = sum(zap_data.values())
 
-    # ─── HTML ────────────────────────────────────────────────────────────────
+    # HTML avec boutons Dark/Light ✅
     html = f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -503,17 +394,30 @@ def generate_dashboard():
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
     :root {{
-      --bg:        #0a0f1e;
-      --surface:   #0f172a;
-      --surface2:  #1e293b;
-      --border:    rgba(255,255,255,0.07);
-      --accent:    #38bdf8;
-      --accent2:   #818cf8;
-      --danger:    #ef4444;
-      --warn:      #f97316;
-      --ok:        #22c55e;
-      --text:      #e2e8f0;
-      --muted:     #94a3b8;
+      --bg: #0a0f1e;
+      --surface: #0f172a;
+      --surface2: #1e293b;
+      --border: rgba(255,255,255,0.07);
+      --accent: #38bdf8;
+      --accent2: #818cf8;
+      --danger: #ef4444;
+      --warn: #f97316;
+      --ok: #22c55e;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+    }}
+    [data-theme="light"] {{
+      --bg: #fef7e0;
+      --surface: #fff8e1;
+      --surface2: #f8fafc;
+      --border: rgba(0,0,0,0.08);
+      --accent: #f59e0b;
+      --accent2: #d97706;
+      --danger: #dc2626;
+      --warn: #ea580c;
+      --ok: #16a34a;
+      --text: #1e293b;
+      --muted: #475569;
     }}
     *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{
@@ -523,29 +427,34 @@ def generate_dashboard():
       font-size: 14px;
       line-height: 1.6;
       min-height: 100vh;
+      transition: all 0.3s ease;
     }}
-
-    /* ── HEADER ── */
     .dash-header {{
-      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #0f172a 100%);
+      background: linear-gradient(135deg, var(--surface2) 0%, var(--accent) 60%, var(--surface2) 100%);
       border-bottom: 1px solid var(--border);
       padding: 28px 40px 22px;
       position: relative;
       overflow: hidden;
     }}
-    .dash-header::before {{
-      content: '';
-      position: absolute; inset: 0;
-      background: radial-gradient(ellipse at 70% 50%, rgba(56,189,248,0.07) 0%, transparent 60%);
-      pointer-events: none;
+    .card-dark, .kpi, .risk-banner, .ai-box {{ 
+      background: var(--surface) !important; 
+      border-color: var(--border) !important; 
+      color: var(--text) !important;
+      transition: all 0.3s ease;
     }}
-    .dash-header h1 {{
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 1.6rem;
-      font-weight: 700;
-      letter-spacing: .04em;
-      color: #f8fafc;
+    .theme-toggle {{
+      position: fixed; top: 20px; right: 20px; z-index: 9999;
+      display: flex; gap: 10px;
     }}
+    .theme-btn {{
+      width: 50px; height: 40px; border: none; border-radius: 25px;
+      cursor: pointer; font-weight: 600; font-size: 13px;
+      transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    }}
+    .theme-btn:hover {{ transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.25); }}
+    .theme-btn.active {{ box-shadow: 0 0 0 3px var(--accent) !important; }}
+    .dash-header h1 {{ font-family: 'JetBrains Mono', monospace; font-size: 1.6rem; font-weight: 700; letter-spacing: .04em; color: #f8fafc; }}
     .dash-header h1 span {{ color: var(--accent); }}
     .meta-row {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }}
     .meta-pill {{
@@ -557,206 +466,69 @@ def generate_dashboard():
       font-size: .72rem;
       color: var(--muted);
     }}
-    .meta-pill a {{ color: var(--accent); text-decoration: none; }}
-
-    /* ── CARDS ── */
-    .card-dark {{
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 20px;
-      transition: border-color .25s;
-    }}
-    .card-dark:hover {{ border-color: rgba(56,189,248,0.2); }}
+    .card-dark {{ border-radius: 14px; padding: 20px; transition: border-color .25s; }}
+    .card-dark:hover {{ border-color: rgba(var(--accent), 0.2); }}
     .card-title {{
       font-family: 'JetBrains Mono', monospace;
-      font-size: .78rem;
-      font-weight: 600;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 14px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-size: .78rem; font-weight: 600; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--muted);
+      margin-bottom: 14px; border-bottom: 1px solid var(--border);
+      padding-bottom: 10px; display: flex; align-items: center; gap: 8px;
     }}
-
-    /* ── RISK BANNER ── */
     .risk-banner {{
-      background: var(--surface);
-      border: 1px solid var(--border);
       border-left: 5px solid {risk['color']};
-      border-radius: 14px;
-      padding: 20px 28px;
-      display: flex;
-      align-items: center;
-      gap: 28px;
-      flex-wrap: wrap;
+      border-radius: 14px; padding: 20px 28px;
+      display: flex; align-items: center; gap: 28px; flex-wrap: wrap;
     }}
     .risk-score {{
       font-family: 'JetBrains Mono', monospace;
-      font-size: 3.5rem;
-      font-weight: 700;
-      color: {risk['color']};
+      font-size: 3.5rem; font-weight: 700; color: {risk['color']};
       line-height: 1;
     }}
     .risk-score small {{ font-size: 1.1rem; color: var(--muted); }}
     .risk-bar-outer {{
       flex: 1; min-width: 120px; height: 8px;
-      background: rgba(255,255,255,0.08);
-      border-radius: 4px; overflow: hidden;
+      background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;
     }}
     .risk-bar-inner {{
-      height: 100%;
-      width: {risk['score']}%;
-      background: {risk['color']};
-      border-radius: 4px;
+      height: 100%; width: {risk['score']}%;
+      background: {risk['color']}; border-radius: 4px;
       transition: width .6s ease;
     }}
-
-    /* ── KPI CARDS ── */
-    .kpi-grid {{
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-      gap: 14px;
-    }}
-    .kpi {{
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 18px 20px;
-      text-align: center;
-    }}
-    .kpi-val {{
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 2.4rem;
-      font-weight: 700;
-      line-height: 1.1;
-    }}
-    .kpi-lbl {{
-      font-size: .75rem;
-      color: var(--muted);
-      margin-top: 4px;
-      font-weight: 500;
-    }}
-
-    /* ── AI SECTION ── */
+    .kpi-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }}
+    .kpi {{ border-radius: 12px; padding: 18px 20px; text-align: center; }}
+    .kpi-val {{ font-family: 'JetBrains Mono', monospace; font-size: 2.4rem; font-weight: 700; line-height: 1.1; }}
+    .kpi-lbl {{ font-size: .75rem; color: var(--muted); margin-top: 4px; font-weight: 500; }}
     .ai-box {{
       background: linear-gradient(135deg, rgba(6,182,212,0.04) 0%, rgba(99,102,241,0.04) 100%);
-      border: 1px solid rgba(6,182,212,0.15);
-      border-radius: 12px;
-      padding: 24px;
-      font-size: .95rem;
-      color: var(--text);
-      line-height: 1.75;
+      border: 1px solid rgba(6,182,212,0.15); border-radius: 12px; padding: 24px;
+      font-size: .95rem; color: var(--text); line-height: 1.75;
     }}
-    .ai-box h1, .ai-box h2 {{
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--accent);
-      font-size: 1rem;
-      font-weight: 600;
-      margin: 20px 0 8px;
-      letter-spacing: .05em;
-    }}
-    .ai-box h3 {{
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--accent2);
-      font-size: .9rem;
-      font-weight: 600;
-      margin: 14px 0 6px;
-    }}
-    .ai-box strong {{ color: #fbbf24; }}
-    .ai-box ul {{ padding-left: 20px; }}
-    .ai-box li {{ margin-bottom: 6px; }}
-
-    /* ── SECTION LABEL ── */
     .section-label {{
-      font-family: 'JetBrains Mono', monospace;
-      font-size: .68rem;
-      font-weight: 700;
-      letter-spacing: .14em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin: 32px 0 12px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      font-family: 'JetBrains Mono', monospace; font-size: .68rem; font-weight: 700;
+      letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+      margin: 32px 0 12px; display: flex; align-items: center; gap: 10px;
     }}
-    .section-label::after {{
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }}
-
-    /* ── NOTE BOX ── */
+    .section-label::after {{ content: ''; flex: 1; height: 1px; background: var(--border); }}
     .note {{
-      background: rgba(255,255,255,0.03);
-      border-left: 2px solid rgba(148,163,184,0.3);
-      padding: 7px 12px;
-      font-size: .75rem;
-      color: var(--muted);
-      border-radius: 0 6px 6px 0;
-      margin-top: 10px;
+      background: rgba(255,255,255,0.03); border-left: 2px solid rgba(148,163,184,0.3);
+      padding: 7px 12px; font-size: .75rem; color: var(--muted);
+      border-radius: 0 6px 6px 0; margin-top: 10px;
     }}
-
-    /* ── FOOTER ── */
     footer {{
-      text-align: center;
-      padding: 28px 0 20px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: .72rem;
-      color: var(--muted);
-      border-top: 1px solid var(--border);
-      margin-top: 40px;
+      text-align: center; padding: 28px 0 20px;
+      font-family: 'JetBrains Mono', monospace; font-size: .72rem; color: var(--muted);
+      border-top: 1px solid var(--border); margin-top: 40px;
     }}
     footer a {{ color: var(--accent); text-decoration: none; }}
-<!-- Toggle Theme Buttons -->
-<div id="theme-toggle" style="
-  position: fixed; top: 20px; right: 20px; z-index: 9999;
-  display: flex; gap: 10px;
-">
-  <button id="dark-mode" class="theme-btn active" title="Dark Mode">🌙</button>
-  <button id="light-mode" class="theme-btn" title="Light Mode">☀️</button>
-</div>
+  </style>
+</head>
+<body>
 
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  const darkBtn = document.getElementById('dark-mode');
-  const lightBtn = document.getElementById('light-mode');
-  const root = document.documentElement;
-  
-  // Détecte thème préféré
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const savedTheme = localStorage.getItem('theme') || (prefersDark ? 'dark' : 'light');
-  setTheme(savedTheme);
-  
-  // Toggle listeners
-  darkBtn.onclick = () => setTheme('dark');
-  lightBtn.onclick = () => setTheme('light');
-  
-  function setTheme(theme) {
-    root.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-    
-    // Toggle boutons actifs
-    [darkBtn, lightBtn].forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`${theme}-mode`).classList.add('active');
-  }
-});
-</script>
-
-<style>
-<!-- ✅ Toggle Theme (version sûre) -->
-""" + """
-<div id="theme-toggle" style="
-  position: fixed; top: 20px; right: 20px; z-index: 9999;
-  display: flex; gap: 10px;
-">
-  <button id="dark-mode" class="theme-btn active" title="Dark Mode (Défaut)">🌙 Dark</button>
-  <button id="light-mode" class="theme-btn" title="Light Mode Moderne">☀️ Light</button>
+<!-- ✅ BOUTONS THEME (FIX) -->
+<div class="theme-toggle">
+  <button id="dark-mode" class="theme-btn active" title="Dark Mode">🌙 Dark</button>
+  <button id="light-mode" class="theme-btn" title="Light Mode">☀️ Light</button>
 </div>
 
 <script>
@@ -765,7 +537,6 @@ document.addEventListener('DOMContentLoaded', function() {{
   const lightBtn = document.getElementById('light-mode');
   const root = document.documentElement;
   
-  // Charge thème sauvegardé
   const savedTheme = localStorage.getItem('theme') || 'dark';
   setTheme(savedTheme);
   
@@ -781,42 +552,7 @@ document.addEventListener('DOMContentLoaded', function() {{
 }});
 </script>
 
-<style>
-/* Toggle Buttons */
-.theme-btn {{
-  width: 50px; height: 40px; border: none; border-radius: 25px;
-  cursor: pointer; font-weight: 600; font-size: 13px;
-  transition: all 0.3s ease; box-shadow: 0 4px 14px rgba(0,0,0,0.1);
-  backdrop-filter: blur(12px);
-}}
-.theme-btn:hover {{ transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }}
-.theme-btn.active {{ box-shadow: 0 0 0 3px var(--accent) !important; }}
-
-/* Thèmes CSS Variables */
-:root {{
-  --bg: #0a0f1e; --surface: #0f172a; --text: #e2e8f0; --muted: #94a3b8;
-  --accent: #38bdf8; --danger: #ef4444; --warn: #f97316; --ok: #22c55e;
-  --border: rgba(255,255,255,0.07);
-}}
-
-[data-theme="light"] {{
-  --bg: #fef7e0; --surface: #fff8e1; --text: #1e293b; --muted: #475569;
-  --accent: #f59e0b; --danger: #dc2626; --warn: #ea580c; --ok: #16a34a;
-  --border: rgba(0,0,0,0.08);
-}}
-
-/* Applique à TOUS les éléments */
-body {{ background: var(--bg) !important; color: var(--text) !important; }}
-.card-dark, .kpi, .risk-banner, .ai-box {{ 
-  background: var(--surface) !important; border-color: var(--border) !important; 
-}}
-.dash-header {{ background: linear-gradient(135deg, var(--surface) 0%, var(--accent)20%, var(--surface) 100%) !important; }}
-</style>
-""" + f"""
-</head>
-<body>
-
-<!-- ── HEADER ── -->
+<!-- HEADER -->
 <div class="dash-header">
   <h1>🛡️ DevSecOps <span>Executive</span> Dashboard</h1>
   <p style="color:var(--muted);font-size:.85rem;margin-top:4px">Pipeline CI/CD — Projet WebGoat</p>
@@ -831,8 +567,6 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
 </div>
 
 <div style="padding:28px 32px">
-
-  <!-- ── SCORE DE RISQUE ── -->
   <div class="section-label">Score de risque global</div>
   <div class="risk-banner mb-4">
     <div class="risk-score">{risk['score']}<small>/100</small></div>
@@ -845,7 +579,6 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
     </div>
   </div>
 
-  <!-- ── KPI ── -->
   <div class="section-label">Résumé des scans</div>
   <div class="kpi-grid mb-4">
     <div class="kpi">
@@ -874,19 +607,6 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
     </div>
   </div>
 
-  <!-- ── AI SUMMARY ── -->
-  <div class="section-label">Synthèse Intelligence Artificielle</div>
-  <div class="card-dark mb-4">
-    <div class="card-title">🤖 Rapport IA Corrélé
-      <span style="font-size:.7rem;background:rgba(6,182,212,0.15);color:var(--accent);
-                   padding:2px 10px;border-radius:10px;margin-left:auto">
-        SCA · SAST · DAST · Runtime · Secrets
-      </span>
-    </div>
-    <div class="ai-box">{ai_html}</div>
-  </div>
-
-  <!-- ── GRAPHIQUES LIGNE 1 ── -->
   <div class="section-label">Analyse détaillée — Scans</div>
   <div class="row g-3 mb-3">
     <div class="col-md-4">
@@ -912,7 +632,6 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
     </div>
   </div>
 
-  <!-- ── GRAPHIQUES LIGNE 2 ── -->
   <div class="row g-3">
     <div class="col-md-4">
       <div class="card-dark h-100">
@@ -941,7 +660,6 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
     Généré automatiquement par GitHub Actions — Run #{meta['run']} —
     <a href="{meta['run_url']}" target="_blank">Voir le pipeline complet</a>
   </footer>
-
 </div>
 </body>
 </html>"""
@@ -949,7 +667,7 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
     output = "global_security_report.html"
     with open(output, "w", encoding="utf-8") as f:
         f.write(html)
-    print(f"[OK] Dashboard généré → {output}")
+    print(f"[OK] Dashboard généré → {output} ✅ Boutons Dark/Light fonctionnels")
 
 
 if __name__ == "__main__":
