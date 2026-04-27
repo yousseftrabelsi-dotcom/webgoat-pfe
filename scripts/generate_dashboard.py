@@ -713,6 +713,81 @@ def generate_dashboard():
       margin-top: 40px;
     }}
     footer a {{ color: var(--accent); text-decoration: none; }}
+<!-- Toggle Theme Buttons -->
+<div id="theme-toggle" style="
+  position: fixed; top: 20px; right: 20px; z-index: 9999;
+  display: flex; gap: 10px;
+">
+  <button id="dark-mode" class="theme-btn active" title="Dark Mode">🌙</button>
+  <button id="light-mode" class="theme-btn" title="Light Mode">☀️</button>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const darkBtn = document.getElementById('dark-mode');
+  const lightBtn = document.getElementById('light-mode');
+  const root = document.documentElement;
+  
+  // Détecte thème préféré
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const savedTheme = localStorage.getItem('theme') || (prefersDark ? 'dark' : 'light');
+  setTheme(savedTheme);
+  
+  // Toggle listeners
+  darkBtn.onclick = () => setTheme('dark');
+  lightBtn.onclick = () => setTheme('light');
+  
+  function setTheme(theme) {
+    root.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    
+    // Toggle boutons actifs
+    [darkBtn, lightBtn].forEach(btn => btn.classList.remove('active'));
+    document.getElementById(`${theme}-mode`).classList.add('active');
+  }
+});
+</script>
+
+<style>
+/* Theme Toggle Buttons */
+.theme-btn {
+  width: 48px; height: 48px; border-radius: 50%;
+  border: none; cursor: pointer; font-size: 20px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  backdrop-filter: blur(10px);
+}
+.theme-btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+.theme-btn.active { box-shadow: 0 0 0 3px var(--accent), 0 4px 12px rgba(0,0,0,0.2); }
+
+/* CSS Variables Dual Theme */
+:root {
+  /* Dark (défaut) */
+  --bg: #0a0f1e; --surface: #0f172a; --surface2: #1e293b;
+  --border: rgba(255,255,255,0.07); --text: #e2e8f0; --muted: #94a3b8;
+  --accent: #38bdf8; --danger: #ef4444; --warn: #f97316; --ok: #22c55e;
+}
+
+[data-theme="light"] {
+  /* Light Moderne (Blanc crème + accents dorés) */
+  --bg: #f8fafc; --surface: #ffffff; --surface2: #f1f5f9;
+  --border: rgba(0,0,0,0.08); --text: #1e293b; --muted: #64748b;
+  --accent: #f59e0b; --danger: #dc2626; --warn: #ea580c; --ok: #16a34a;
+}
+
+/* Applique aux éléments existants */
+body { background: var(--bg) !important; color: var(--text) !important; }
+.card-dark, .risk-banner, .kpi, .ai-box { 
+  background: var(--surface) !important; 
+  border-color: var(--border) !important; 
+  color: var(--text) !important; 
+}
+.dash-header { 
+  background: linear-gradient(135deg, var(--surface2) 0%, #1e40af 60%, var(--surface2) 100%) !important; 
+}
+.meta-pill, .note { background: rgba(255,255,255,0.1) !important; border-color: var(--border) !important; }
+.risk-score { color: var(--danger) !important; }
+</style>
   </style>
 </head>
 <body>
