@@ -105,49 +105,49 @@ jobs:
   # (dast-scan et falco-scan démarrent ensemble après la phase 1)
   # ═══════════════════════════════════════════════════════════════════
 
-    dast-scan:
-      needs: [secrets-scan, sast-scan, vulnerability-scan]
-      runs-on: ubuntu-latest
-      permissions:
-        contents: read
-        # ✅ SUPPRIME issues: write (cause du 403)
-      steps:
-      - uses: actions/checkout@v4
+  dast-scan:
+    needs: [secrets-scan, sast-scan, vulnerability-scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # ✅ SUPPRIME issues: write (cause du 403)
+    steps:
+    - uses: actions/checkout@v4
     
-      - name: Start WebGoat + Healthcheck
-        run: |
-          docker run -d --name webgoat -p 8080:8080 webgoat/webgoat
-          for i in {1..30}; do
-            if curl -f http://localhost:8080/WebGoat/login >/dev/null 2>&1; then
-              echo "✅ WebGoat UP après $i tentatives"
-              break
-            fi
-            echo "⏳ Wait $i/30..."
-            sleep 3
-          done || echo "⚠️ WebGoat lent mais ZAP continue"
+    - name: Start WebGoat + Healthcheck
+      run: |
+        docker run -d --name webgoat -p 8080:8080 webgoat/webgoat
+        for i in {1..30}; do
+          if curl -f http://localhost:8080/WebGoat/login >/dev/null 2>&1; then
+            echo "✅ WebGoat UP après $i tentatives"
+            break
+          fi
+          echo "⏳ Wait $i/30..."
+          sleep 3
+        done || echo "⚠️ WebGoat lent mais ZAP continue"
     
-      - name: ZAP Baseline Scan (No GitHub Issues)
-        uses: zaproxy/action-baseline@v0.15.0
-        with:
-          target: 'http://localhost:8080/WebGoat'
-          # ✅ Désactive création d'issues GitHub
-          github_token: '${{ secrets.GITHUB_TOKEN }}'
-          # Reports seulement (pas d'actions GitHub)
-        continue-on-error: true
+    - name: ZAP Baseline Scan (No GitHub Issues)
+      uses: zaproxy/action-baseline@v0.15.0
+      with:
+        target: 'http://localhost:8080/WebGoat'
+        # ✅ Désactive création d'issues GitHub
+        github_token: '${{ secrets.GITHUB_TOKEN }}'
+        # Reports seulement (pas d'actions GitHub)
+      continue-on-error: true
     
-      - name: Cleanup
-        if: always()
-        run: docker rm -f webgoat
+    - name: Cleanup
+      if: always()
+      run: docker rm -f webgoat
     
-      - name: Upload ZAP Reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: report-zap
-          path: |
-            report_html.html
-            report_json.json
-            report_md.md
+    - name: Upload ZAP Reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: report-zap
+        path: |
+          report_html.html
+          report_json.json
+          report_md.md
   falco-scan:
     needs: [secrets-scan, sast-scan, vulnerability-scan]
     runs-on: ubuntu-latest
