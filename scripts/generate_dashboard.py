@@ -17,20 +17,28 @@ import plotly.graph_objects as go
 # ─────────────────────────────────────────────────────────────────────────────
 
 def parse_trivy(path: str = "trivy-results.json") -> dict:
-    counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
+    counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0, "Unknown": 0}
     if not os.path.isfile(path):
         print(f"[WARN] Trivy : fichier introuvable ({path})", file=sys.stderr)
         return counts
+    
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
+        
+        # ✅ Parcourt TOUS les Results + Vulnerabilities
         for result in data.get("Results", []):
             for vuln in result.get("Vulnerabilities", []):
-                sev = vuln.get("Severity", "").capitalize()
+                # Gère capitalisation Trivy ("HIGH" → "High")
+                sev = vuln.get("Severity", "Unknown").title()
                 if sev in counts:
                     counts[sev] += 1
+                print(f"Trivy: +1 {sev} ({vuln.get('Title', 'N/A')[:50]})")
+                
+        print(f"[INFO] Trivy total: {sum(counts.values())} vulns")
     except Exception as e:
-        print(f"[ERROR] Trivy : {e}", file=sys.stderr)
+        print(f"[ERROR] Trivy parse: {e}", file=sys.stderr)
+    
     return counts
 
 
