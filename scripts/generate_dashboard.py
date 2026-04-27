@@ -749,46 +749,70 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <style>
-/* Theme Toggle Buttons */
-.theme-btn {
-  width: 48px; height: 48px; border-radius: 50%;
-  border: none; cursor: pointer; font-size: 20px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  backdrop-filter: blur(10px);
-}
-.theme-btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
-.theme-btn.active { box-shadow: 0 0 0 3px var(--accent), 0 4px 12px rgba(0,0,0,0.2); }
+<!-- ✅ Toggle Theme (version sûre) -->
+""" + """
+<div id="theme-toggle" style="
+  position: fixed; top: 20px; right: 20px; z-index: 9999;
+  display: flex; gap: 10px;
+">
+  <button id="dark-mode" class="theme-btn active" title="Dark Mode (Défaut)">🌙 Dark</button>
+  <button id="light-mode" class="theme-btn" title="Light Mode Moderne">☀️ Light</button>
+</div>
 
-/* CSS Variables Dual Theme */
-:root {
-  /* Dark (défaut) */
-  --bg: #0a0f1e; --surface: #0f172a; --surface2: #1e293b;
-  --border: rgba(255,255,255,0.07); --text: #e2e8f0; --muted: #94a3b8;
+<script>
+document.addEventListener('DOMContentLoaded', function() {{
+  const darkBtn = document.getElementById('dark-mode');
+  const lightBtn = document.getElementById('light-mode');
+  const root = document.documentElement;
+  
+  // Charge thème sauvegardé
+  const savedTheme = localStorage.getItem('theme') || 'dark';
+  setTheme(savedTheme);
+  
+  darkBtn.onclick = () => setTheme('dark');
+  lightBtn.onclick = () => setTheme('light');
+  
+  function setTheme(theme) {{
+    root.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(theme + '-mode').classList.add('active');
+  }}
+}});
+</script>
+
+<style>
+/* Toggle Buttons */
+.theme-btn {{
+  width: 50px; height: 40px; border: none; border-radius: 25px;
+  cursor: pointer; font-weight: 600; font-size: 13px;
+  transition: all 0.3s ease; box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+  backdrop-filter: blur(12px);
+}}
+.theme-btn:hover {{ transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }}
+.theme-btn.active {{ box-shadow: 0 0 0 3px var(--accent) !important; }}
+
+/* Thèmes CSS Variables */
+:root {{
+  --bg: #0a0f1e; --surface: #0f172a; --text: #e2e8f0; --muted: #94a3b8;
   --accent: #38bdf8; --danger: #ef4444; --warn: #f97316; --ok: #22c55e;
-}
+  --border: rgba(255,255,255,0.07);
+}}
 
-[data-theme="light"] {
-  /* Light Moderne (Blanc crème + accents dorés) */
-  --bg: #f8fafc; --surface: #ffffff; --surface2: #f1f5f9;
-  --border: rgba(0,0,0,0.08); --text: #1e293b; --muted: #64748b;
+[data-theme="light"] {{
+  --bg: #fef7e0; --surface: #fff8e1; --text: #1e293b; --muted: #475569;
   --accent: #f59e0b; --danger: #dc2626; --warn: #ea580c; --ok: #16a34a;
-}
+  --border: rgba(0,0,0,0.08);
+}}
 
-/* Applique aux éléments existants */
-body { background: var(--bg) !important; color: var(--text) !important; }
-.card-dark, .risk-banner, .kpi, .ai-box { 
-  background: var(--surface) !important; 
-  border-color: var(--border) !important; 
-  color: var(--text) !important; 
-}
-.dash-header { 
-  background: linear-gradient(135deg, var(--surface2) 0%, #1e40af 60%, var(--surface2) 100%) !important; 
-}
-.meta-pill, .note { background: rgba(255,255,255,0.1) !important; border-color: var(--border) !important; }
-.risk-score { color: var(--danger) !important; }
+/* Applique à TOUS les éléments */
+body {{ background: var(--bg) !important; color: var(--text) !important; }}
+.card-dark, .kpi, .risk-banner, .ai-box {{ 
+  background: var(--surface) !important; border-color: var(--border) !important; 
+}}
+.dash-header {{ background: linear-gradient(135deg, var(--surface) 0%, var(--accent)20%, var(--surface) 100%) !important; }}
 </style>
-  </style>
+""" + f"""
 </head>
 <body>
 
