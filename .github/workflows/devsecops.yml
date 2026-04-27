@@ -11,7 +11,6 @@ permissions:
 jobs:
   # ═══════════════════════════════════════════════════════════════════
   # PHASE 1 — Scans statiques en PARALLÈLE
-  # (secrets-scan, sast-scan, vulnerability-scan tournent simultanément)
   # ═══════════════════════════════════════════════════════════════════
 
   secrets-scan:
@@ -28,8 +27,6 @@ jobs:
 
       - name: Run Gitleaks
         id: gitleaks
-        # continue-on-error pour ne pas bloquer les autres scans,
-        # mais le code de sortie est capturé pour le rapport.
         continue-on-error: true
         run: |
           gitleaks detect --source . --report-format sarif --report-path results.sarif
@@ -40,10 +37,7 @@ jobs:
         run: |
           echo "::error::Gitleaks a détecté des secrets dans le code source !"
           echo "::error::Consultez l'artefact gitleaks-results pour les détails."
-          # Décommentez pour bloquer le pipeline sur détection de secrets :
-          # exit 1
 
-      # Nom d'artefact unifié → "reports" pour tout récupérer d'un coup
       - name: Upload Gitleaks Report
         if: always()
         uses: actions/upload-artifact@v4
@@ -64,7 +58,7 @@ jobs:
         uses: SonarSource/sonarcloud-github-action@v3.1.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN:  ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
             -Dsonar.organization=yousseftrabelsi-dotcom
@@ -101,16 +95,14 @@ jobs:
           path: trivy-results.json
 
   # ═══════════════════════════════════════════════════════════════════
-  # PHASE 2 — Scans dynamiques en PARALLÈLE
-  # (dast-scan et falco-scan démarrent ensemble après la phase 1)
+  # PHASE 2 — Scans dynamiques
   # ═══════════════════════════════════════════════════════════════════
 
   dast-scan:
-    needs: [secrets-scan, sast-scan, vulnerability-scan
+    needs: [secrets-scan, sast-scan, vulnerability-scan]  # ✅ CORRIGÉ : ] fermante ajoutée
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # ✅ SUPPRIME issues: write (cause du 403)
     steps:
     - uses: actions/checkout@v4
     
@@ -127,13 +119,10 @@ jobs:
         done || echo "⚠️ WebGoat lent mais ZAP continue"
     
     - name: ZAP Baseline Scan (No GitHub Issues)
+      continue-on-error: true
       uses: zaproxy/action-baseline@v0.15.0
       with:
         target: 'http://localhost:8080/WebGoat'
-        # ✅ Désactive création d'issues GitHub
-        github_token: '${{ secrets.GITHUB_TOKEN }}'
-        # Reports seulement (pas d'actions GitHub)
-      continue-on-error: true
     
     - name: Cleanup
       if: always()
@@ -148,6 +137,7 @@ jobs:
           report_html.html
           report_json.json
           report_md.md
+
   falco-scan:
     needs: [secrets-scan, sast-scan, vulnerability-scan]
     runs-on: ubuntu-latest
@@ -180,7 +170,7 @@ jobs:
           sleep 10
         
           # Extract logs → falco-results.json pour dashboard
-          docker logs falco-monitor 2>&1 | grep '"output"' > falco-results.json
+          docker logs falco-monitor 2>&1 | grep '"output"' > falco-results.json || touch falco-results.json
           echo "Alertes: $(wc -l < falco-results.json)"
           docker rm -f falco-monitor
     
@@ -190,8 +180,9 @@ jobs:
         with:
           name: report-falco
           path: falco-results.json         
+
   # ═══════════════════════════════════════════════════════════════════
-  # PHASE 3a — Analyse IA (lit TOUS les rapports des 5 outils)
+  # PHASE 3a — Analyse IA
   # ═══════════════════════════════════════════════════════════════════
 
   ai-agent-analysis:
@@ -201,7 +192,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # On télécharge chaque artefact individuellement pour être sûr de les avoir
       - name: Download Trivy report
         uses: actions/download-artifact@v4
         with:
@@ -250,7 +240,7 @@ jobs:
           path: ai-security-summary.txt
 
   # ═══════════════════════════════════════════════════════════════════
-  # PHASE 3b — Génération du Dashboard final
+  # PHASE 3b — Dashboard final
   # ═══════════════════════════════════════════════════════════════════
 
   generate-dashboard:
@@ -259,12 +249,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write   # Pour commenter une PR si besoin
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
 
-      # Téléchargement de chaque artefact dans un sous-dossier
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -289,11 +278,11 @@ jobs:
 
       - name: Generate Dashboard
         env:
-          GITHUB_SHA:        ${{ github.sha }}
+          GITHUB_SHA: ${{ github.sha }}
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
-          GITHUB_RUN_URL:    ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GITHUB_REF_NAME:   ${{ github.ref_name }}
-          GITHUB_ACTOR:      ${{ github.actor }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: python scripts/generate_dashboard.py
 
       - name: Upload Final Dashboard
