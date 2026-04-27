@@ -137,6 +137,9 @@ jobs:
         with:
           target: "http://localhost:8080/WebGoat"
           fail_action: false
+      - name: Cleanup
+        if: always()
+        run:docker rm -f webgoat
 
       - name: Upload ZAP Report
         if: always()
