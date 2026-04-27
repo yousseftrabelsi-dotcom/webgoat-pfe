@@ -1,3 +1,4 @@
+/WebGoat$ cat .github/workflows/devsecops.yml
 name: DevSecOps WebGoat Pipeline
 
 on:
@@ -167,16 +168,16 @@ jobs:
             falco -o json_output=true -o engine.kind=ebpf -o ebpf.probe=modern
         
           sleep 5  # Init
-         
+        
           # Simulations → Déclenche alertes
           docker run --rm ubuntu:latest cat /etc/shadow     # Notice shell
           docker run --rm ubuntu:latest touch /etc/malware  # Warning write
           docker run --rm alpine:latest cat /etc/passwd     # Error sensitive
           docker run --rm alpine:latest sh -c "nc -l -p 1234"  # Critical network
-          
+        
           sleep 10
         
-        # Extract logs → falco-results.json pour dashboard
+          # Extract logs → falco-results.json pour dashboard
           docker logs falco-monitor 2>&1 | grep '"output"' > falco-results.json
           echo "Alertes: $(wc -l < falco-results.json)"
           docker rm -f falco-monitor
@@ -186,8 +187,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: report-falco
-          path: falco-results.json
-  # ══════════════════════════════════════════════════════════════════
+          path: falco-results.json         
+  # ═══════════════════════════════════════════════════════════════════
   # PHASE 3a — Analyse IA (lit TOUS les rapports des 5 outils)
   # ═══════════════════════════════════════════════════════════════════
 
