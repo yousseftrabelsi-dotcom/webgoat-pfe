@@ -144,18 +144,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Generate Falco Events (Simulé mais réaliste)
+      - name: Generate Falco Events (Vos données personnalisées)
         run: |
-          # Crée falco-results.json avec données réelles (parse_falco OK)
+          # ✅ 2 Notice, 1 Warning, 3 Error, 0 Critical (exactement vos specs)
           cat > falco-results.json << 'EOF'
-          {"priority": "Notice", "output": "Shell spawned in container", "time": "2026-04-27"}
-          {"priority": "Warning", "output": "Write below root path", "time": "2026-04-27"}
-          {"priority": "Error", "output": "Read sensitive file unauthorized", "time": "2026-04-27"}
-          {"priority": "Critical", "output": "Unexpected network connection", "time": "2026-04-27"}
+          {"priority": "Notice", "output": "Shell spawned in container (ubuntu)", "time": "2026-04-27T19:30:00Z"}
+          {"priority": "Notice", "output": "Shell spawned in container (alpine)", "time": "2026-04-27T19:30:05Z"}
+          {"priority": "Warning", "output": "Write below root path /etc/malware", "time": "2026-04-27T19:30:10Z"}
+          {"priority": "Error", "output": "Read sensitive file /etc/passwd unauthorized", "time": "2026-04-27T19:30:15Z"}
+          {"priority": "Error", "output": "Read sensitive file /etc/shadow unauthorized", "time": "2026-04-27T19:30:20Z"}
+          {"priority": "Error", "output": "Unexpected process execution nc", "time": "2026-04-27T19:30:25Z"}
           EOF
           
-          echo "✅ Falco : 4 alertes simulées (Notice,Warning,Error,Critical)"
-          echo "Alertes: $(wc -l < falco-results.json)"
+          echo "✅ Falco généré : $(jq 'group_by(.priority) | map({priority: .[0].priority, count: length})[]' falco-results.json)"
+          echo "Total alertes: $(wc -l < falco-results.json)"
           cat falco-results.json
       
       - name: Upload Falco Report
