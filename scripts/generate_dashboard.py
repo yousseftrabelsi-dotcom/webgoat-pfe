@@ -377,10 +377,16 @@ def fig_trend() -> go.Figure:
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. CONVERSION MARKDOWN → HTML (sans dépendance externe)
 # ─────────────────────────────────────────────────────────────────────────────
-
+def clean_ai_text(text: str) -> str:
+    return (
+        text.replace("\\n", "\n")
+            .replace("\\t", " ")
+            .replace("\r", "")
+            .strip()
+    )
 def md_to_html(text: str) -> str:
     """Conversion Markdown minimale (titres, listes, gras, italique)."""
-    lines = text.split("\n")
+    lines = text.replace("\\n", "\n").split("\n")
     out = []
     in_ul = False
     for line in lines:
@@ -477,7 +483,7 @@ def generate_dashboard():
     f_trend  = fig_trend().to_html(full_html=False,          include_plotlyjs=pjs)
 
     # — Résumé IA : Markdown → HTML + injection des graphiques —
-    ai_html = md_to_html(ai_raw)
+    ai_html = md_to_html((clean_ai_text(ai_raw))
     ai_html = inject_graphs(ai_html, {
         "GRAPHIQUE_SCA":     f_sca,
         "GRAPHIQUE_SAST":    f_sast,
