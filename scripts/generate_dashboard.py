@@ -483,7 +483,7 @@ def generate_dashboard():
     f_trend  = fig_trend().to_html(full_html=False,          include_plotlyjs=pjs)
 
     # — Résumé IA : Markdown → HTML + injection des graphiques —
-    ai_html = md_to_html((clean_ai_text(ai_raw))
+    ai_html = md_to_html((clean_ai_text(ai_raw)))
     ai_html = inject_graphs(ai_html, {
         "GRAPHIQUE_SCA":     f_sca,
         "GRAPHIQUE_SAST":    f_sast,
