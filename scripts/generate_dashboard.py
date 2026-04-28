@@ -713,6 +713,7 @@ def generate_dashboard():
       margin-top: 40px;
     }}
     footer a {{ color: var(--accent); text-decoration: none; }}
+</style>
 <!-- Toggle Theme Buttons -->
 <div id="theme-toggle" style="
   position: fixed; top: 20px; right: 20px; z-index: 9999;
@@ -723,7 +724,7 @@ def generate_dashboard():
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {{
   const darkBtn = document.getElementById('dark-mode');
   const lightBtn = document.getElementById('light-mode');
   const root = document.documentElement;
@@ -737,20 +738,19 @@ document.addEventListener('DOMContentLoaded', () => {
   darkBtn.onclick = () => setTheme('dark');
   lightBtn.onclick = () => setTheme('light');
   
-  function setTheme(theme) {
+  function setTheme(theme) {{
     root.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
     
     // Toggle boutons actifs
     [darkBtn, lightBtn].forEach(btn => btn.classList.remove('active'));
     document.getElementById(`${theme}-mode`).classList.add('active');
-  }
-});
+  }}
+}});
 </script>
 
 <style>
 <!-- ✅ Toggle Theme (version sûre) -->
-""" + """
 <div id="theme-toggle" style="
   position: fixed; top: 20px; right: 20px; z-index: 9999;
   display: flex; gap: 10px;
