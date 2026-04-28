@@ -17,28 +17,20 @@ import plotly.graph_objects as go
 # ─────────────────────────────────────────────────────────────────────────────
 
 def parse_trivy(path: str = "trivy-results.json") -> dict:
-    counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0, "Unknown": 0}
+    counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
     if not os.path.isfile(path):
         print(f"[WARN] Trivy : fichier introuvable ({path})", file=sys.stderr)
         return counts
-    
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        
-        # ✅ Parcourt TOUS les Results + Vulnerabilities
         for result in data.get("Results", []):
             for vuln in result.get("Vulnerabilities", []):
-                # Gère capitalisation Trivy ("HIGH" → "High")
-                sev = vuln.get("Severity", "Unknown").title()
+                sev = vuln.get("Severity", "").capitalize()
                 if sev in counts:
                     counts[sev] += 1
-                print(f"Trivy: +1 {sev} ({vuln.get('Title', 'N/A')[:50]})")
-                
-        print(f"[INFO] Trivy total: {sum(counts.values())} vulns")
     except Exception as e:
-        print(f"[ERROR] Trivy parse: {e}", file=sys.stderr)
-    
+        print(f"[ERROR] Trivy : {e}", file=sys.stderr)
     return counts
 
 
@@ -89,7 +81,7 @@ def parse_zap(path: str = "report_html.html") -> dict:
             html = f.read()
         for risk in list(counts.keys()):
             m = re.search(
-                rf'<td[^>]*>\\s*{risk}\\s*</td>\\s*<td[^>]*>\\s*(\\d+)\\s*</td>',
+                rf'<td[^>]*>\s*{risk}\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>',
                 html, re.IGNORECASE,
             )
             if m:
@@ -377,16 +369,10 @@ def fig_trend() -> go.Figure:
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. CONVERSION MARKDOWN → HTML (sans dépendance externe)
 # ─────────────────────────────────────────────────────────────────────────────
-def clean_ai_text(text: str) -> str:
-    return (
-        text.replace("\\n", "\n")
-            .replace("\\t", " ")
-            .replace("\r", "")
-            .strip()
-    )
+
 def md_to_html(text: str) -> str:
     """Conversion Markdown minimale (titres, listes, gras, italique)."""
-    lines = text.replace("\\n", "\n").split("\n")
+    lines = text.split("\n")
     out = []
     in_ul = False
     for line in lines:
@@ -405,8 +391,8 @@ def md_to_html(text: str) -> str:
             if not in_ul:
                 out.append("<ul>"); in_ul = True
             item = line[2:]
-            item = re.sub(r"\\*\\*(.+?)\\*\\*", r"<strong>\\1</strong>", item)
-            item = re.sub(r"\\*(.+?)\\*",     r"<em>\\1</em>",          item)
+            item = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", item)
+            item = re.sub(r"\*(.+?)\*",     r"<em>\1</em>",          item)
             out.append(f"<li>{item}</li>")
         # Ligne vide
         elif line.strip() == "":
@@ -415,12 +401,12 @@ def md_to_html(text: str) -> str:
         else:
             if in_ul: out.append("</ul>"); in_ul = False
             para = line
-            para = re.sub(r"\\*\\*(.+?)\\*\\*", r"<strong>\\1</strong>", para)
-            para = re.sub(r"\\*(.+?)\\*",     r"<em>\\1</em>",          para)
+            para = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", para)
+            para = re.sub(r"\*(.+?)\*",     r"<em>\1</em>",          para)
             out.append(f"<p>{para}</p>")
     if in_ul:
         out.append("</ul>")
-    return "\\n".join(out)
+    return "\n".join(out)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -483,7 +469,7 @@ def generate_dashboard():
     f_trend  = fig_trend().to_html(full_html=False,          include_plotlyjs=pjs)
 
     # — Résumé IA : Markdown → HTML + injection des graphiques —
-    ai_html = md_to_html((clean_ai_text(ai_raw)))
+    ai_html = md_to_html(ai_raw)
     ai_html = inject_graphs(ai_html, {
         "GRAPHIQUE_SCA":     f_sca,
         "GRAPHIQUE_SAST":    f_sast,
