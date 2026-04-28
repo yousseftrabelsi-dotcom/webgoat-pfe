@@ -1,0 +1,385 @@
+name: DevSecOps WebGoat Pipeline
+
+on:
+  push:
+    branches: ["main"]
+
+# Permissions minimales au niveau global
+permissions:
+  contents: read
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 1 — Scans statiques en PARALLÈLE
+  # (secrets-scan, sast-scan, vulnerability-scan tournent simultanément)
+  # ═══════════════════════════════════════════════════════════════════
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Gitleaks
+        run: |
+          wget -qO- https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz | tar xz
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Run Gitleaks
+        id: gitleaks
+        # continue-on-error pour ne pas bloquer les autres scans,
+        # mais le code de sortie est capturé pour le rapport.
+        continue-on-error: true
+        run: |
+          gitleaks detect --source . --report-format sarif --report-path results.sarif
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Annotate if secrets found
+        if: steps.gitleaks.outputs.exit_code != '0'
+        run: |
+          echo "::error::Gitleaks a détecté des secrets dans le code source !"
+          echo "::error::Consultez l'artefact gitleaks-results pour les détails."
+          # Décommentez pour bloquer le pipeline sur détection de secrets :
+          # exit 1
+
+      # Nom d'artefact unifié → "reports" pour tout récupérer d'un coup
+      - name: Upload Gitleaks Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-gitleaks
+          path: results.sarif
+
+  sast-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Analyze with SonarCloud
+        uses: SonarSource/sonarcloud-github-action@v3.1.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN:  ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=yousseftrabelsi-dotcom
+            -Dsonar.projectKey=yousseftrabelsi-dotcom_webgoat-pfe
+            -Dsonar.java.binaries=.
+
+  vulnerability-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install and Run Trivy
+        id: trivy
+        continue-on-error: true
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b /usr/local/bin
+          trivy fs --format json --output trivy-results.json --exit-code 1 --severity CRITICAL .
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Annotate Trivy result
+        run: |
+          if [ "${{ steps.trivy.outputs.exit_code }}" != "0" ]; then
+            echo "::warning::Trivy a trouvé des vulnérabilités CRITIQUES dans les dépendances !"
+          else
+            echo "Aucune vulnérabilité critique détectée par Trivy."
+          fi
+
+      - name: Upload Trivy Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-trivy
+          path: trivy-results.json
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 2 — Scans dynamiques en PARALLÈLE
+  # (dast-scan et falco-scan démarrent ensemble après la phase 1)
+  # ═══════════════════════════════════════════════════════════════════
+
+  Run zaproxy/action-baseline@v0.15.0
+starting the program
+github run id :25010553987
+(node:2697) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+/usr/bin/chmod a+w /home/runner/work/webgoat-pfe/webgoat-pfe
+/usr/bin/docker pull ghcr.io/zaproxy/zaproxy:stable -q
+ghcr.io/zaproxy/zaproxy:stable
+/usr/bin/docker run -v /home/runner/work/webgoat-pfe/webgoat-pfe:/zap/wrk/:rw --network=host -e ZAP_AUTH_HEADER -e ZAP_AUTH_HEADER_VALUE -e ZAP_AUTH_HEADER_SITE -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t http://localhost:8080/WebGoat -J report_json.json -w report_md.md -r report_html.html
+Using the Automation Framework
+Total of 21 URLs
+PASS: Vulnerable JS Library (Powered by Retire.js) [10003]
+PASS: In Page Banner Information Leak [10009]
+PASS: Cookie No HttpOnly Flag [10010]
+PASS: Cookie Without Secure Flag [10011]
+PASS: Re-examine Cache-control Directives [10015]
+PASS: Cross-Domain JavaScript Source File Inclusion [10017]
+PASS: Content-Type Header Missing [10019]
+PASS: Information Disclosure - Debug Error Messages [10023]
+PASS: Information Disclosure - Sensitive Information in URL [10024]
+PASS: Information Disclosure - Sensitive Information in HTTP Referrer Header [10025]
+PASS: HTTP Parameter Override [10026]
+PASS: Information Disclosure - Suspicious Comments [10027]
+PASS: Off-site Redirect [10028]
+PASS: Cookie Poisoning [10029]
+PASS: User Controllable Charset [10030]
+PASS: Viewstate [10032]
+PASS: Directory Browsing [10033]
+PASS: Heartbleed OpenSSL Vulnerability (Indicative) [10034]
+PASS: Strict-Transport-Security Header [10035]
+PASS: HTTP Server Response Header [10036]
+PASS: Server Leaks Information via "X-Powered-By" HTTP Response Header Field(s) [10037]
+PASS: X-Backend-Server Header Information Leak [10039]
+PASS: Secure Pages Include Mixed Content [10040]
+PASS: HTTP to HTTPS Insecure Transition in Form Post [10041]
+PASS: HTTPS to HTTP Insecure Transition in Form Post [10042]
+PASS: User Controllable JavaScript Event (XSS) [10043]
+PASS: Big Redirect Detected (Potential Sensitive Information Leak) [10044]
+PASS: Retrieved from Cache [10050]
+PASS: X-ChromeLogger-Data (XCOLD) Header Information Leak [10052]
+PASS: CSP [10055]
+PASS: X-Debug-Token Information Leak [10056]
+PASS: Username Hash Found [10057]
+PASS: X-AspNet-Version Response Header [10061]
+PASS: PII Disclosure [10062]
+PASS: Timestamp Disclosure [10096]
+PASS: Hash Disclosure [10097]
+PASS: Cross-Domain Misconfiguration [10098]
+PASS: Source Code Disclosure [10099]
+PASS: Weak Authentication Method [10105]
+PASS: Reverse Tabnabbing [10108]
+PASS: Modern Web Application [10109]
+PASS: Dangerous JS Functions [10110]
+PASS: Verification Request Identified [10113]
+PASS: Script Served From Malicious Domain (polyfill) [10115]
+PASS: ZAP is Out of Date [10116]
+PASS: Private IP Disclosure [2]
+PASS: Session ID in URL Rewrite [3]
+PASS: Script Passive Scan Rules [50001]
+PASS: Stats Passive Scan Rule [50003]
+PASS: Insecure JSF ViewState [90001]
+PASS: Java Serialization Object [90002]
+PASS: Sub Resource Integrity Attribute Missing [90003]
+PASS: Charset Mismatch [90011]
+PASS: Application Error Disclosure [90022]
+PASS: WSDL File Detection [90030]
+PASS: Loosely Scoped Cookie [90033]
+WARN-NEW: Missing Anti-clickjacking Header [10020] x 5 
+	http://localhost:8080/WebGoat (200 OK)
+	http://localhost:8080/WebGoat/login (200 OK)
+	http://localhost:8080/WebGoat/login?error (200 OK)
+	http://localhost:8080/WebGoat/registration (200 OK)
+	http://localhost:8080/WebGoat/register.mvc (200 OK)
+WARN-NEW: X-Content-Type-Options Header Missing [10021] x 5 
+	http://localhost:8080/WebGoat (200 OK)
+	http://localhost:8080/WebGoat/css/font-awesome.min.css (200 OK)
+	http://localhost:8080/WebGoat/css/img/favicon.ico (200 OK)
+	http://localhost:8080/WebGoat/css/main.css (200 OK)
+	http://localhost:8080/WebGoat/login (200 OK)
+WARN-NEW: User Controllable HTML Element Attribute (Potential XSS) [10031] x 4 
+	http://localhost:8080/WebGoat/register.mvc (200 OK)
+	http://localhost:8080/WebGoat/register.mvc (200 OK)
+	http://localhost:8080/WebGoat/register.mvc (200 OK)
+	http://localhost:8080/WebGoat/register.mvc (200 OK)
+WARN-NEW: Content Security Policy (CSP) Header Not Set [10038] x 2 
+	http://localhost:8080/WebGoat (200 OK)
+	http://localhost:8080/sitemap.xml (404 Not Found)
+WARN-NEW: Non-Storable Content [10049] x 8 
+	http://localhost:8080/WebGoat (302 Found)
+	http://localhost:8080/WebGoat/ (302 Found)
+	http://localhost:8080/WebGoat/start.mvc (302 Found)
+	http://localhost:8080/ (404 Not Found)
+	http://localhost:8080/WebGoat (200 OK)
+WARN-NEW: Cookie without SameSite Attribute [10054] x 1 
+	http://localhost:8080/WebGoat/ (302 Found)
+WARN-NEW: Permissions Policy Header Not Set [10063] x 5 
+	http://localhost:8080/ (404 Not Found)
+	http://localhost:8080/WebGoat (200 OK)
+	http://localhost:8080/WebGoat/login (200 OK)
+	http://localhost:8080/robots.txt (404 Not Found)
+	http://localhost:8080/sitemap.xml (404 Not Found)
+WARN-NEW: Authentication Request Identified [10111] x 1 
+	http://localhost:8080/WebGoat/login (302 Found)
+WARN-NEW: Session Management Response Identified [10112] x 1 
+	http://localhost:8080/WebGoat/ (302 Found)
+WARN-NEW: Absence of Anti-CSRF Tokens [10202] x 5 
+	http://localhost:8080/WebGoat (200 OK)
+	http://localhost:8080/WebGoat/login (200 OK)
+	http://localhost:8080/WebGoat/login?error (200 OK)
+	http://localhost:8080/WebGoat/registration (200 OK)
+	http://localhost:8080/WebGoat/register.mvc (200 OK)
+WARN-NEW: Cross-Origin-Embedder-Policy Header Missing or Invalid [90004] x 11 
+	http://localhost:8080/WebGoat (200 OK)
+	http://localhost:8080/WebGoat/login (200 OK)
+	http://localhost:8080/WebGoat/registration (200 OK)
+	http://localhost:8080/WebGoat (200 OK)
+	http://localhost:8080/WebGoat/login (200 OK)
+FAIL-NEW: 0	FAIL-INPROG: 0	WARN-NEW: 11	WARN-INPROG: 0	INFO: 0	IGNORE: 0	PASS: 56
+Automation plan warnings:
+	Job spider error accessing URL http://localhost:8080/ status code returned : 404 expected 200
+Scanning process completed, starting to analyze the results!
+Alerts present in the current report: true
+[@octokit/request] "POST https://api.github.com/repos/yousseftrabelsi-dotcom/webgoat-pfe/issues" is deprecated. It is scheduled to be removed on Fri, 10 Mar 2028 00:00:00 GMT. See https://docs.github.com/en/rest/about-the-rest-api/api-versions
+POST /repos/yousseftrabelsi-dotcom/webgoat-pfe/issues - 403 with id 2C00:64FFA:173AE5D:5D68
+  falco-scan:
+    needs: [secrets-scan, sast-scan, vulnerability-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+    
+      - name: Pull Falco Official Image
+        run: docker pull falcosecurity/falco:latest
+    
+      - name: Run Falco Container + Simulations
+        run: |
+          # Start Falco monitoring HOST (privileged mounts)
+          docker run -d --name falco-monitor \
+            --privileged \
+            -v /proc:/host/proc:ro \
+            -v /sys/kernel/debug:/sys/kernel/debug:ro \
+            -v /var/run/docker.sock:/host/var/run/docker.sock \
+            -v /etc:/host/etc:ro \
+            falcosecurity/falco:latest \
+            falco -o json_output=true -o engine.kind=ebpf -o ebpf.probe=modern
+        
+          sleep 5  # Init
+        
+          # Simulations → Déclenche alertes
+          docker run --rm ubuntu:latest cat /etc/shadow     # Notice shell
+          docker run --rm ubuntu:latest touch /etc/malware  # Warning write
+          docker run --rm alpine:latest cat /etc/passwd     # Error sensitive
+          docker run --rm alpine:latest sh -c "nc -l -p 1234"  # Critical network
+        
+          sleep 10
+        
+          # Extract logs → falco-results.json pour dashboard
+          docker logs falco-monitor 2>&1 | grep '"output"' > falco-results.json
+          echo "Alertes: $(wc -l < falco-results.json)"
+          docker rm -f falco-monitor
+    
+      - name: Upload Falco Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-falco
+          path: falco-results.json         
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 3a — Analyse IA (lit TOUS les rapports des 5 outils)
+  # ═══════════════════════════════════════════════════════════════════
+
+  ai-agent-analysis:
+    needs: [dast-scan, falco-scan]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # On télécharge chaque artefact individuellement pour être sûr de les avoir
+      - name: Download Trivy report
+        uses: actions/download-artifact@v4
+        with:
+          name: report-trivy
+        continue-on-error: true
+
+      - name: Download Gitleaks report
+        uses: actions/download-artifact@v4
+        with:
+          name: report-gitleaks
+        continue-on-error: true
+
+      - name: Download ZAP report
+        uses: actions/download-artifact@v4
+        with:
+          name: report-zap
+        continue-on-error: true
+
+      - name: Download Falco report
+        uses: actions/download-artifact@v4
+        with:
+          name: report-falco
+        continue-on-error: true
+
+      - name: List available reports
+        run: ls -lah *.json *.sarif *.html 2>/dev/null || echo "Certains rapports sont manquants."
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install google-genai
+
+      - name: Run AI Agent
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scripts/ai_analyzer.py
+
+      - name: Upload AI Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-ai
+          path: ai-security-summary.txt
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 3b — Génération du Dashboard final
+  # ═══════════════════════════════════════════════════════════════════
+
+  generate-dashboard:
+    needs: ai-agent-analysis
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # Pour commenter une PR si besoin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Téléchargement de chaque artefact dans un sous-dossier
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Flatten artifacts to working directory
+        run: |
+          find artifacts/ -type f | while read f; do
+            cp "$f" . && echo "Copié : $f"
+          done
+          echo "=== Fichiers disponibles pour le dashboard ==="
+          ls -lah *.json *.sarif *.html *.txt 2>/dev/null || true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: python -m pip install plotly markdown 
+
+      - name: Generate Dashboard
+        env:
+          GITHUB_SHA:        ${{ github.sha }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_RUN_URL:    ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_REF_NAME:   ${{ github.ref_name }}
+          GITHUB_ACTOR:      ${{ github.actor }}
+        run: python scripts/generate_dashboard.py
+
+      - name: Upload Final Dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: DevSecOps-Final-Dashboard
+          path: global_security_report.html
+          retention-days: 30
