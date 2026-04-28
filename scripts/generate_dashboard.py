@@ -380,7 +380,7 @@ def fig_trend() -> go.Figure:
 
 def md_to_html(text: str) -> str:
     """Conversion Markdown minimale (titres, listes, gras, italique)."""
-    lines = text.split("\\n")
+    lines = text.split("\n")
     out = []
     in_ul = False
     for line in lines:
@@ -744,7 +744,7 @@ document.addEventListener('DOMContentLoaded', () => {{
     
     // Toggle boutons actifs
     [darkBtn, lightBtn].forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`${theme}-mode`).classList.add('active');
+    document.getElementById(`${{theme}}-mode`).classList.add('active');
   }}
 }});
 </script>
