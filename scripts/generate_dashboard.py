@@ -1,6 +1,6 @@
 """
 generate_dashboard.py
-Génère global_security_report.html — Dashboard DevSecOps (thème sombre)
+Génère global_security_report.html — Dashboard DevSecOps (thème sombre et light)
 Lit les vrais fichiers de rapport et affiche 6 graphiques interactifs Plotly.
 """
 
