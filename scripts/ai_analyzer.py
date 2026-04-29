@@ -1,4 +1,5 @@
 import os
+import time
 from google import genai
 
 print("Démarrage de l'analyse IA corrélée (tous les outils)...")
@@ -22,9 +23,9 @@ for outil, fichier in fichiers_rapports.items():
         try:
             with open(fichier, "r", encoding="utf-8") as f:
                 contenu = f.read()
-            # On limite la taille pour ne pas dépasser le contexte Gemini
+            # CORRECTION : On limite la taille à 15000 caractères pour ne pas surcharger l'API (Erreur 503)
             contexte_global += (
-                f"\n\n=== RÉSULTATS {outil.upper()} ===\n{contenu[:50000]}\n"
+                f"\n\n=== RÉSULTATS {outil.upper()} ===\n{contenu[:15000]}\n"
             )
         except Exception as e:
             print(f"  Erreur lecture {fichier}: {e}")
@@ -66,15 +67,38 @@ Termine toujours par une section ## Recommandations Prioritaires listant les act
 """
 
 print("Envoi des données à Gemini...")
-try:
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-    )
-    with open("ai-security-summary.txt", "w", encoding="utf-8") as f:
-        f.write(response.text)
-    print("Analyse IA terminée et sauvegardée avec succès !")
-except Exception as e:
-    print(f"Erreur lors de l'appel à l'API Gemini : {e}")
-    with open("ai-security-summary.txt", "w", encoding="utf-8") as f:
-        f.write(f"Erreur lors de la génération de l'analyse IA : {e}")
+
+# 4. CORRECTION : Logique de Retry pour éviter l'échec direct en cas d'erreur 503
+max_retries = 3
+
+for tentative in range(max_retries):
+    try:
+        print(f"Tentative {tentative + 1}/{max_retries}...")
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
+        # Si on arrive ici, l'API a répondu avec succès
+        with open("ai-security-summary.txt", "w", encoding="utf-8") as f:
+            f.write(response.text)
+        print("Analyse IA terminée et sauvegardée avec succès !")
+        break # On sort de la boucle puisque ça a marché
+
+    except Exception as e:
+        erreur_msg = str(e)
+        print(f"Erreur API interceptée : {erreur_msg}")
+        
+        # On vérifie si l'erreur est due à une surcharge (503, 500, ou quotas)
+        if "503" in erreur_msg or "500" in erreur_msg or "Resource exhausted" in erreur_msg:
+            if tentative < max_retries - 1:
+                print("Le serveur Gemini est surchargé. Pause de 15 secondes avant de réessayer...")
+                time.sleep(15)
+            else:
+                print("Toutes les tentatives ont échoué.")
+                with open("ai-security-summary.txt", "w", encoding="utf-8") as f:
+                    f.write("Erreur : Impossible de générer l'analyse IA. Les serveurs de Google Gemini sont indisponibles (Erreur 503 continue).")
+        else:
+            # Si c'est une autre erreur (clé API invalide, etc.), on arrête tout de suite
+            with open("ai-security-summary.txt", "w", encoding="utf-8") as f:
+                f.write(f"Erreur lors de la génération de l'analyse IA : {erreur_msg}")
+            break
