@@ -461,20 +461,27 @@ def generate_dashboard():
 
     # — Figures Plotly → HTML partiel —
     # ─────────────────────────────────────────────────────────────────────────────
+    # 0. Création des objets graphiques (on appelle les fonctions avec les données)
+    obj_sca   = fig_sca(trivy_data)
+    obj_sast  = fig_sast(sonar_data)
+    obj_dast  = fig_dast(zap_data)
+    obj_falco = fig_falco(falco_data)
+    obj_sec   = fig_secrets(gitleaks_cnt)
+    obj_trend = fig_trend()
     # 1. Version pour la grille classique en bas de page
-    f_sca_grid = fig_sca.to_html(full_html=False, include_plotlyjs=False)
-    f_sast_grid = fig_sast.to_html(full_html=False, include_plotlyjs=False)
-    f_dast_grid = fig_dast.to_html(full_html=False, include_plotlyjs=False)
-    f_sec_grid = fig_sec.to_html(full_html=False, include_plotlyjs=False)
-    f_falco_grid = fig_falco.to_html(full_html=False, include_plotlyjs=False)
-    f_trend_grid = fig_trend.to_html(full_html=False, include_plotlyjs=False)
+    f_sca_grid = obj_sca.to_html(full_html=False, include_plotlyjs=False)
+    f_sast_grid = obj_sast.to_html(full_html=False, include_plotlyjs=False)
+    f_dast_grid = obj_dast.to_html(full_html=False, include_plotlyjs=False)
+    f_sec_grid = obj_sec.to_html(full_html=False, include_plotlyjs=False)
+    f_falco_grid = obj_falco.to_html(full_html=False, include_plotlyjs=False)
+    f_trend_grid = obj_trend.to_html(full_html=False, include_plotlyjs=False)
 
     # 2. Version dédiée à l'IA (génère de nouveaux IDs uniques)
-    f_sca_ai = fig_sca.to_html(full_html=False, include_plotlyjs=False)
-    f_sast_ai = fig_sast.to_html(full_html=False, include_plotlyjs=False)
-    f_dast_ai = fig_dast.to_html(full_html=False, include_plotlyjs=False)
-    f_sec_ai = fig_sec.to_html(full_html=False, include_plotlyjs=False)
-    f_falco_ai = fig_falco.to_html(full_html=False, include_plotlyjs=False)
+    f_sca_ai = obj_sca.to_html(full_html=False, include_plotlyjs=False)
+    f_sast_ai = obj_sast.to_html(full_html=False, include_plotlyjs=False)
+    f_dast_ai = obj_dast.to_html(full_html=False, include_plotlyjs=False)
+    f_sec_ai = obj_sec.to_html(full_html=False, include_plotlyjs=False)
+    f_falco_ai = obj_falco.to_html(full_html=False, include_plotlyjs=False)
     # — Résumé IA : Markdown → HTML + injection des graphiques —
     ai_html = md_to_html(ai_raw)
     ai_html = inject_graphs(ai_html, {
@@ -877,19 +884,19 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
     <div class="col-md-4">
       <div class="card-dark" style="height: 320px;">
         <div class="card-title" style="font-size: 0.65rem;">SCA - Dépendances</div>
-        {f_sca}
+        {f_sca_grid}
       </div>
     </div>
     <div class="col-md-4">
       <div class="card-dark" style="height: 320px;">
         <div class="card-title" style="font-size: 0.65rem;">SAST - Code Source</div>
-        {f_sast}
+        {f_sast_grid}
       </div>
     </div>
     <div class="col-md-4">
       <div class="card-dark" style="height: 320px;">
         <div class="card-title" style="font-size: 0.65rem;">DAST - Web</div>
-        {f_dast}
+        {f_dast_grid}
       </div>
     </div>
   </div>
@@ -897,19 +904,19 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
     <div class="col-md-4">
       <div class="card-dark" style="height: 320px;">
         <div class="card-title" style="font-size: 0.65rem;">Runtime - Falco</div>
-        {f_falco}
+        {f_falco_grid}
       </div>
     </div>
     <div class="col-md-4">
       <div class="card-dark" style="height: 320px;">
         <div class="card-title" style="font-size: 0.65rem;">Secrets - Gitleaks</div>
-        {f_sec}
+        {f_sec_grid}
       </div>
     </div>
     <div class="col-md-4">
       <div class="card-dark" style="height: 320px;">
         <div class="card-title" style="font-size: 0.65rem;">Tendance Globale</div>
-        {f_trend}
+        {f_trend_grid}
       </div>
     </div>
   </div>
