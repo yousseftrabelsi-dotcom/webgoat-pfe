@@ -746,9 +746,6 @@ def generate_dashboard():
       margin-top: 40px;
     }}
     footer a {{ color: var(--accent); text-decoration: none; }}
-        /* ... tes autres styles ... */
-        footer { text-align: center; ... }
-
         /* AJOUTE CETTE LIGNE ICI : */
         .exec-text {{ color: #fbbf24; font-weight: 800; text-transform: uppercase; }}
 </style>
