@@ -750,7 +750,7 @@ def generate_dashboard():
         footer { text-align: center; ... }
 
         /* AJOUTE CETTE LIGNE ICI : */
-        .exec-text { color: #fbbf24; font-weight: 800; text-transform: uppercase; }
+        .exec-text {{ color: #fbbf24; font-weight: 800; text-transform: uppercase; }}
 </style>
 <!-- Toggle Theme Buttons -->
 <div id="theme-toggle" style="
