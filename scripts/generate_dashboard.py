@@ -460,22 +460,29 @@ def generate_dashboard():
     }
 
     # — Figures Plotly → HTML partiel —
-    pjs = False  # plotlyjs déjà chargé via CDN dans <head>
-    f_sca    = fig_sca(trivy_data).to_html(full_html=False,  include_plotlyjs=pjs)
-    f_sast   = fig_sast(sonar_data).to_html(full_html=False, include_plotlyjs=pjs)
-    f_dast   = fig_dast(zap_data).to_html(full_html=False,   include_plotlyjs=pjs)
-    f_falco  = fig_falco(falco_data).to_html(full_html=False, include_plotlyjs=pjs)
-    f_sec    = fig_secrets(gitleaks_cnt).to_html(full_html=False, include_plotlyjs=pjs)
-    f_trend  = fig_trend().to_html(full_html=False,          include_plotlyjs=pjs)
+    # ─────────────────────────────────────────────────────────────────────────────
+    # 1. Version pour la grille classique en bas de page
+    f_sca_grid = fig_sca.to_html(full_html=False, include_plotlyjs=False)
+    f_sast_grid = fig_sast.to_html(full_html=False, include_plotlyjs=False)
+    f_dast_grid = fig_dast.to_html(full_html=False, include_plotlyjs=False)
+    f_sec_grid = fig_sec.to_html(full_html=False, include_plotlyjs=False)
+    f_falco_grid = fig_falco.to_html(full_html=False, include_plotlyjs=False)
+    f_trend_grid = fig_trend.to_html(full_html=False, include_plotlyjs=False)
 
+    # 2. Version dédiée à l'IA (génère de nouveaux IDs uniques)
+    f_sca_ai = fig_sca.to_html(full_html=False, include_plotlyjs=False)
+    f_sast_ai = fig_sast.to_html(full_html=False, include_plotlyjs=False)
+    f_dast_ai = fig_dast.to_html(full_html=False, include_plotlyjs=False)
+    f_sec_ai = fig_sec.to_html(full_html=False, include_plotlyjs=False)
+    f_falco_ai = fig_falco.to_html(full_html=False, include_plotlyjs=False)
     # — Résumé IA : Markdown → HTML + injection des graphiques —
     ai_html = md_to_html(ai_raw)
     ai_html = inject_graphs(ai_html, {
-        "GRAPHIQUE_SCA":     f_sca,
-        "GRAPHIQUE_SAST":    f_sast,
-        "GRAPHIQUE_DAST":    f_dast,
-        "GRAPHIQUE_SECRETS": f_sec,
-        "GRAPHIQUE_FALCO":   f_falco,
+        "GRAPHIQUE_SCA":     f_sca_ai,
+        "GRAPHIQUE_SAST":    f_sast_ai,
+        "GRAPHIQUE_DAST":    f_dast_ai,
+        "GRAPHIQUE_SECRETS": f_sec_ai,
+        "GRAPHIQUE_FALCO":   f_falco_ai,
     })
 
     # — KPIs —
