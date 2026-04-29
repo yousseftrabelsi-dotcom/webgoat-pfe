@@ -746,6 +746,11 @@ def generate_dashboard():
       margin-top: 40px;
     }}
     footer a {{ color: var(--accent); text-decoration: none; }}
+        /* ... tes autres styles ... */
+        footer { text-align: center; ... }
+
+        /* AJOUTE CETTE LIGNE ICI : */
+        .exec-text { color: #fbbf24; font-weight: 800; text-transform: uppercase; }
 </style>
 <!-- Toggle Theme Buttons -->
 <div id="theme-toggle" style="
@@ -851,7 +856,12 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
 
 <!-- ── HEADER ── -->
 <div class="dash-header">
-  <h1>🛡️ DevSecOps <span>Executive</span> Dashboard</h1>
+  <div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>🛡️ DevSecOps <span class="exec-text">Executive</span> Dashboard</h1>
+        
+        <span class="badge bg-secondary">Run #{meta['run']} — {meta['date']}</span>
+    </div>
   <p style="color:var(--muted);font-size:.85rem;margin-top:4px">Pipeline CI/CD — Projet WebGoat</p>
   <div class="meta-row">
     <span class="meta-pill">🔀 {meta['branch']}</span>
