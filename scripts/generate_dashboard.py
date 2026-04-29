@@ -857,7 +857,7 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>🛡️ DevSecOps <span class="exec-text">Executive</span> Dashboard</h1>
         
-        <span class="badge bg-secondary">Run #{meta['run']} — {meta['date']}</span>
+        <span class="badge bg-secondary">Run #{meta['run']} — {meta['timestamp']}</span>
     </div>
   <p style="color:var(--muted);font-size:.85rem;margin-top:4px">Pipeline CI/CD — Projet WebGoat</p>
   <div class="meta-row">
