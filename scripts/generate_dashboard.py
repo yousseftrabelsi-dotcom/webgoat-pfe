@@ -492,6 +492,33 @@ def generate_dashboard():
         "GRAPHIQUE_FALCO":   f_falco_ai,
     })
 
+    # — Injection forcée du graphe SAST si Gemini ne l'a pas inclus —
+    # SonarCloud ne génère pas de fichier JSON lisible par l'IA, donc le tag
+    # [GRAPHIQUE_SAST] n'est souvent pas émis par Gemini. On l'insère de force
+    # juste après le premier titre h2 qui mentionne "SAST" ou "SonarCloud",
+    # ou à défaut après le premier <h2> du rapport.
+    sast_wrapper = (
+        '<div style="margin:18px auto;max-width:700px;background:rgba(255,255,255,0.03);'
+        'border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,0.08)">'
+        + f_sast_ai + '</div>'
+    )
+    if sast_wrapper not in ai_html:
+        # Cherche un titre SAST/SonarCloud pour insérer juste après
+        m = re.search(r'(<h[23][^>]*>[^<]*(sast|sonar|code source|code statique)[^<]*</h[23]>)',
+                      ai_html, re.IGNORECASE)
+        if m:
+            insert_after = m.group(0)
+            ai_html = ai_html.replace(insert_after, insert_after + "\n" + sast_wrapper, 1)
+        else:
+            # Fallback : insère après le 2ème <h2> (section 2 du rapport)
+            h2_matches = list(re.finditer(r'<h2[^>]*>.*?</h2>', ai_html, re.IGNORECASE))
+            if len(h2_matches) >= 2:
+                pos = h2_matches[1].end()
+                ai_html = ai_html[:pos] + "\n" + sast_wrapper + ai_html[pos:]
+            elif h2_matches:
+                pos = h2_matches[0].end()
+                ai_html = ai_html[:pos] + "\n" + sast_wrapper + ai_html[pos:]
+
     # — KPIs —
     total_cve   = sum(trivy_data.values())
     total_falco = sum(falco_data.values())
@@ -879,47 +906,6 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
       <div class="kpi-lbl">🎯 Score Risque Global</div>
     </div>
   </div>
-<div class="section-label">Aperçu visuel des analyses</div>
-  <div class="row g-3 mb-4">
-    <div class="col-md-4">
-      <div class="card-dark" style="height: 320px;">
-        <div class="card-title" style="font-size: 0.65rem;">SCA - Dépendances</div>
-        {f_sca_grid}
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="card-dark" style="height: 320px;">
-        <div class="card-title" style="font-size: 0.65rem;">SAST - Code Source</div>
-        {f_sast_grid}
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="card-dark" style="height: 320px;">
-        <div class="card-title" style="font-size: 0.65rem;">DAST - Web</div>
-        {f_dast_grid}
-      </div>
-    </div>
-  </div>
-  <div class="row g-3 mb-5">
-    <div class="col-md-4">
-      <div class="card-dark" style="height: 320px;">
-        <div class="card-title" style="font-size: 0.65rem;">Runtime - Falco</div>
-        {f_falco_grid}
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="card-dark" style="height: 320px;">
-        <div class="card-title" style="font-size: 0.65rem;">Secrets - Gitleaks</div>
-        {f_sec_grid}
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="card-dark" style="height: 320px;">
-        <div class="card-title" style="font-size: 0.65rem;">Tendance Globale</div>
-        {f_trend_grid}
-      </div>
-    </div>
-  </div>
   <!-- ── AI SUMMARY ── -->
   <div class="section-label">Synthèse Intelligence Artificielle</div>
   <div class="card-dark mb-4">
@@ -932,8 +918,7 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
     <div class="ai-box">{ai_html}</div>
   </div>
 
-  <!-- ── GRAPHIQUES LIGNE 1 ── -->
-  <div class="section-label">Analyse détaillée — Scans</div>
+  <!-- ── GRAPHIQUES 3 + 3 ── -->
   <div class="row g-3 mb-3">
     <div class="col-md-4">
       <div class="card-dark h-100">
@@ -946,7 +931,7 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
       <div class="card-dark h-100">
         <div class="card-title">🔍 Code Source (SAST)</div>
         {f_sast_grid}
-        <div class="note">Analyse SonarCloud. Intégrer l'API pour données 100 % dynamiques.</div>
+        <div class="note">Analyse SonarCloud — bugs, vulnérabilités et hotspots de sécurité.</div>
       </div>
     </div>
     <div class="col-md-4">
@@ -958,7 +943,6 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
     </div>
   </div>
 
-  <!-- ── GRAPHIQUES LIGNE 2 ── -->
   <div class="row g-3">
     <div class="col-md-4">
       <div class="card-dark h-100">
