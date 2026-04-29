@@ -865,7 +865,47 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
       <div class="kpi-lbl">🎯 Score Risque Global</div>
     </div>
   </div>
-
+<div class="section-label">Aperçu visuel des analyses</div>
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card-dark" style="height: 320px;">
+        <div class="card-title" style="font-size: 0.65rem;">SCA - Dépendances</div>
+        {f_sca}
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card-dark" style="height: 320px;">
+        <div class="card-title" style="font-size: 0.65rem;">SAST - Code Source</div>
+        {f_sast}
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card-dark" style="height: 320px;">
+        <div class="card-title" style="font-size: 0.65rem;">DAST - Web</div>
+        {f_dast}
+      </div>
+    </div>
+  </div>
+  <div class="row g-3 mb-5">
+    <div class="col-md-4">
+      <div class="card-dark" style="height: 320px;">
+        <div class="card-title" style="font-size: 0.65rem;">Runtime - Falco</div>
+        {f_falco}
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card-dark" style="height: 320px;">
+        <div class="card-title" style="font-size: 0.65rem;">Secrets - Gitleaks</div>
+        {f_sec}
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card-dark" style="height: 320px;">
+        <div class="card-title" style="font-size: 0.65rem;">Tendance Globale</div>
+        {f_trend}
+      </div>
+    </div>
+  </div>
   <!-- ── AI SUMMARY ── -->
   <div class="section-label">Synthèse Intelligence Artificielle</div>
   <div class="card-dark mb-4">
