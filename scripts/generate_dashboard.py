@@ -938,21 +938,21 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
     <div class="col-md-4">
       <div class="card-dark h-100">
         <div class="card-title">📦 Dépendances (SCA)</div>
-        {f_sca_ai}
+        {f_sca_grid}
         <div class="note">CVE détectées par Trivy dans les librairies tierces. Données réelles du scan.</div>
       </div>
     </div>
     <div class="col-md-4">
       <div class="card-dark h-100">
         <div class="card-title">🔍 Code Source (SAST)</div>
-        {f_sast_ai}
+        {f_sast_grid}
         <div class="note">Analyse SonarCloud. Intégrer l'API pour données 100 % dynamiques.</div>
       </div>
     </div>
     <div class="col-md-4">
       <div class="card-dark h-100">
         <div class="card-title">🌐 Attaques Web (DAST)</div>
-        {f_dast_ai}
+        {f_dast_grid}
         <div class="note">Alertes OWASP ZAP sur le conteneur WebGoat en cours d'exécution.</div>
       </div>
     </div>
@@ -963,21 +963,21 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
     <div class="col-md-4">
       <div class="card-dark h-100">
         <div class="card-title">⚡ Runtime (Falco)</div>
-        {f_falco_ai}
+        {f_falco_grid}
         <div class="note">Comportements suspects capturés en temps réel par Falco.</div>
       </div>
     </div>
     <div class="col-md-4">
       <div class="card-dark h-100">
         <div class="card-title">🔑 Secrets Git (Gitleaks)</div>
-        {f_sec_ai}
+        {f_sec_grid}
         <div class="note">Secrets en clair dans les commits. Zéro tolérance recommandée.</div>
       </div>
     </div>
     <div class="col-md-4">
       <div class="card-dark h-100">
         <div class="card-title">📈 Tendance Sécurité</div>
-        {f_trend_ai}
+        {f_trend_grid}
         <div class="note">Réduction progressive des vulnérabilités au fil des pipelines.</div>
       </div>
     </div>
