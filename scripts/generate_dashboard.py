@@ -659,17 +659,20 @@ def generate_dashboard():
     }}
 
     /* ── STYLE BOÎTE IA (Identique aux Graphes) ── */
+    /* ── STYLE BOÎTE IA (Texte technique sur fond blanc) ── */
     .ai-box {{
-      font-family: 'JetBrains Mono', monospace; /* La même que vos graphiques */
+      font-family: 'JetBrains Mono', monospace; /* La police que vous voulez */
       font-size: 0.9rem;
       line-height: 1.6;
-      color: var(--text-dim);
-      background-color: rgba(30, 41, 59, 0.5);
+      color: #1e293b;             /* Texte gris très foncé (presque noir) */
+      background-color: #ffffff;   /* FOND BLANC comme demandé */
       padding: 20px;
       border-radius: 8px;
-      border: 1px solid var(--border);
-      border-left: 4px solid #8b5cf6; /* Petit liseré violet pour l'IA */
-      white-space: pre-wrap; /* Très important pour garder la mise en page de Gemini */
+      border: 1px solid #e2e8f0;   /* Bordure fine grise */
+      border-left: 5px solid #64748b; /* Liseré gris acier sur le côté */
+      white-space: pre-wrap;       /* Respecte les retours à la ligne */
+      margin-top: 10px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Ombre légère pour le relief */
     }}
     .ai-badge {{
       font-size: .7rem; background: rgba(6,182,212,.15); color: var(--accent);
