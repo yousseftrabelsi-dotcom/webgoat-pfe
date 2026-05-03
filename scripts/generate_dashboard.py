@@ -660,7 +660,7 @@ def generate_dashboard():
 
     /* ── STYLE BOÎTE IA (Texte standard, fond blanc) ── */
     .ai-box {{
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      font-family: 'Arial', sans-serif;
       font-size: 0.9rem;
       line-height: 1.6;
       color: #334155;             /* Texte gris foncé, très lisible */
