@@ -285,7 +285,7 @@ jobs:
 
   generate-dashboard:
     name: "📊 Dashboard — Plotly"
-    needs: ai-agent-analysis
+    needs: [ai-agent-analysis , quality-gate]
     if: always()
     runs-on: ubuntu-latest
     permissions:
