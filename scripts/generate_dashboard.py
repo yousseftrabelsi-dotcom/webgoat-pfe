@@ -587,7 +587,6 @@ def generate_dashboard():
     [data-theme="light"] .dash-header h1 {{ color: #0f172a; }}
     .dash-header h1 span {{ color: #7dd3fc; }}
     .dash-header p {{ color: var(--muted); font-size: .85rem; margin-top: 4px; }}
-=======
     .dash-header h1 span {{ color: #7dd3fc; }}
     .meta-row {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }}
     .meta-pill {{
@@ -659,12 +658,18 @@ def generate_dashboard():
       content: ''; flex: 1; height: 1px; background: var(--border);
     }}
 
-    /* ── AI SECTION ── */
+    /* ── STYLE BOÎTE IA (Identique aux Graphes) ── */
     .ai-box {{
-      background: linear-gradient(135deg, rgba(6,182,212,.04) 0%, rgba(99,102,241,.04) 100%);
-      border: 1px solid rgba(6,182,212,.15);
-      border-radius: 12px; padding: 24px;
-      font-size: .95rem; color: var(--text); line-height: 1.75;
+      font-family: 'JetBrains Mono', monospace; /* La même que vos graphiques */
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+      background-color: rgba(30, 41, 59, 0.5);
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      border-left: 4px solid #8b5cf6; /* Petit liseré violet pour l'IA */
+      white-space: pre-wrap; /* Très important pour garder la mise en page de Gemini */
     }}
     .ai-badge {{
       font-size: .7rem; background: rgba(6,182,212,.15); color: var(--accent);
@@ -681,19 +686,6 @@ def generate_dashboard():
     .ai-box strong {{ color: #fbbf24; }}
     .ai-box ul {{ padding-left: 20px; }}
     .ai-box li {{ margin-bottom: 6px; }}
-    /* ── STYLE BOÎTE IA ── */
-    .ai-box {{
-      font-family: 'JetBrains Mono', Consolas, monospace;
-      font-size: 0.85rem;
-      line-height: 1.7;
-      color: #e2e8f0;
-      background-color: var(--surface);
-      padding: 24px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      border-left: 4px solid #8b5cf6; /* Liseré violet (couleur IA) */
-      white-space: pre-wrap; /* Garde les sauts de ligne de l'IA */
-    }}
     /* ── NOTE BOX ── */
     .note {{
       background: rgba(255,255,255,.03); border-left: 2px solid rgba(148,163,184,.3);
@@ -775,8 +767,6 @@ def generate_dashboard():
     </div>
   </div>
 
-  <!-- ── GRAPHIQUES 3+3 ── -->
-=======
   <!-- ── GRAPHIQUES 3 + 3 ── -->
   <div class="section-label">Graphiques de sécurité</div>
   <div class="row g-3 mb-3">
@@ -802,7 +792,6 @@ def generate_dashboard():
       </div>
     </div>
   </div>
-=======
 
   <div class="row g-3 mb-4">
     <div class="col-md-4">
@@ -834,7 +823,6 @@ def generate_dashboard():
     <div class="card-title">
       🤖 Rapport IA Corrélé
       <span class="ai-badge">SCA · SAST · DAST · Runtime · Secrets</span>
-=======
   <!-- ── AI SUMMARY ── -->
   <div class="section-label">Synthèse Intelligence Artificielle</div>
   <div class="card-dark mb-4">
