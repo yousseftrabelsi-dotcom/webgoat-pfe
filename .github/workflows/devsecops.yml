@@ -335,7 +335,7 @@ jobs:
 # ── Notification Slack ───────────────────────────────────────────
   notify-slack:
     name: "💬 Slack Notification"
-    needs: [quality-gate, dashboard]
+    needs: [quality-gate, generate-dashboard]]
     runs-on: ubuntu-latest
     if: always() # Indispensable pour recevoir une alerte même en cas d'échec
     steps:
