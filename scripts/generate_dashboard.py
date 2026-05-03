@@ -584,9 +584,13 @@ def generate_dashboard():
       font-size: 1.6rem; font-weight: 700; letter-spacing: .04em;
       color: #f8fafc;
     }}
+<<<<<<< HEAD
     [data-theme="light"] .dash-header h1 {{ color: #0f172a; }}
     .dash-header h1 span {{ color: #7dd3fc; }}
     .dash-header p {{ color: var(--muted); font-size: .85rem; margin-top: 4px; }}
+=======
+    .dash-header h1 span {{ color: #7dd3fc; }}
+>>>>>>> 84a218a42b4c58c79a268a5e248da315af039e3d
     .meta-row {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }}
     .meta-pill {{
       background: rgba(255,255,255,.06); border: 1px solid var(--border);
@@ -760,8 +764,12 @@ def generate_dashboard():
       <div class="kpi-lbl">🎯 Score Risque Global</div>
     </div>
   </div>
+<<<<<<< HEAD
 
   <!-- ── GRAPHIQUES 3+3 ── -->
+=======
+  <!-- ── GRAPHIQUES 3 + 3 ── -->
+>>>>>>> 84a218a42b4c58c79a268a5e248da315af039e3d
   <div class="section-label">Graphiques de sécurité</div>
   <div class="row g-3 mb-3">
     <div class="col-md-4">
@@ -786,6 +794,10 @@ def generate_dashboard():
       </div>
     </div>
   </div>
+<<<<<<< HEAD
+=======
+
+>>>>>>> 84a218a42b4c58c79a268a5e248da315af039e3d
   <div class="row g-3 mb-4">
     <div class="col-md-4">
       <div class="card-dark h-100">
@@ -810,12 +822,23 @@ def generate_dashboard():
     </div>
   </div>
 
+<<<<<<< HEAD
   <!-- ── RAPPORT IA ── -->
   <div class="section-label">Synthèse Intelligence Artificielle</div>
   <div class="card-dark mb-4">
     <div class="card-title">
       🤖 Rapport IA Corrélé
       <span class="ai-badge">SCA · SAST · DAST · Runtime · Secrets</span>
+=======
+  <!-- ── AI SUMMARY ── -->
+  <div class="section-label">Synthèse Intelligence Artificielle</div>
+  <div class="card-dark mb-4">
+    <div class="card-title">🤖 Rapport IA Corrélé
+      <span style="font-size:.7rem;background:rgba(6,182,212,0.15);color:var(--accent);
+                   padding:2px 10px;border-radius:10px;margin-left:auto">
+        SCA · SAST · DAST · Runtime · Secrets
+      </span>
+>>>>>>> 84a218a42b4c58c79a268a5e248da315af039e3d
     </div>
     <div class="ai-box">{ai_html}</div>
   </div>
