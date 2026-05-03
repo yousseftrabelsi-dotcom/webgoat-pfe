@@ -658,21 +658,19 @@ def generate_dashboard():
       content: ''; flex: 1; height: 1px; background: var(--border);
     }}
 
-    /* ── STYLE BOÎTE IA (Identique aux Graphes) ── */
-    /* ── STYLE BOÎTE IA (Texte technique sur fond blanc) ── */
+    /* ── STYLE BOÎTE IA (Texte standard, fond blanc) ── */
     .ai-box {{
-      font-family: 'JetBrains Mono', monospace; /* La police que vous voulez */
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
       font-size: 0.9rem;
       line-height: 1.6;
-      color: #1e293b;             /* Texte gris très foncé (presque noir) */
-      background-color: #ffffff;   /* FOND BLANC comme demandé */
+      color: #334155;             /* Texte gris foncé, très lisible */
+      background-color: #ffffff;   /* Fond blanc */
       padding: 20px;
       border-radius: 8px;
-      border: 1px solid #e2e8f0;   /* Bordure fine grise */
-      border-left: 5px solid #64748b; /* Liseré gris acier sur le côté */
-      white-space: pre-wrap;       /* Respecte les retours à la ligne */
+      border: 1px solid #e2e8f0;   /* Bordure subtile */
+      border-left: 5px solid #64748b; /* Liseré gris gauche */
+      white-space: pre-wrap;       /* Garde les sauts de ligne */
       margin-top: 10px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Ombre légère pour le relief */
     }}
     .ai-badge {{
       font-size: .7rem; background: rgba(6,182,212,.15); color: var(--accent);
