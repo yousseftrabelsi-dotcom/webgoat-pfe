@@ -1,9 +1,11 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # DevSecOps WebGoat Pipeline
 # ──────────────────────────────────────────────────────────────────────────────
-# PHASE 1 │ Scans statiques en parallèle  : Gitleaks · SonarCloud · Trivy
-# PHASE 2 │ Scans dynamiques              : OWASP ZAP · Falco
-# PHASE 3 │ Analyse IA + Dashboard final  : Gemini · Plotly
+# PHASE 1 │ Scans statiques   : Gitleaks · SonarCloud · Trivy · Checkov (IaC)
+# PHASE 2 │ Scans dynamiques  : OWASP ZAP · Falco
+# PHASE 3 │ IA + Dashboard    : Gemini · Plotly (+ Matrice OWASP)
+# PHASE 4 │ Quality Gate      : bloque le pipeline si seuils dépassés
+# PHASE 5 │ Notification      : résumé Slack après chaque run
 # ══════════════════════════════════════════════════════════════════════════════
 
 name: DevSecOps WebGoat Pipeline
@@ -78,7 +80,6 @@ jobs:
             -Dsonar.projectKey=yousseftrabelsi-dotcom_webgoat-pfe
             -Dsonar.java.binaries=.
 
-      # Export des métriques SonarCloud en JSON pour le rapport IA
       - name: Export SonarCloud metrics (JSON)
         if: always()
         env:
@@ -90,7 +91,7 @@ jobs:
           metricKeys=bugs,vulnerabilities,security_hotspots,code_smells,\
           coverage,duplicated_lines_density,sqale_rating,reliability_rating,security_rating" \
             -o sonar-results.json \
-            && echo "SonarCloud metrics exportées." \
+            && echo "✅ SonarCloud metrics exportées." \
             || echo "::warning::Export SonarCloud échoué (token ou quota)."
 
       - name: Upload SonarCloud Report
@@ -135,6 +136,43 @@ jobs:
           name: report-trivy
           path: trivy-results.json
 
+  # ── 1d. Scan IaC — Checkov ────────────────────────────────────────────────
+  iac-scan:
+    name: "🏗️ IaC — Checkov"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Checkov
+        run: pip install checkov
+
+      - name: Run IaC Scan
+        id: checkov
+        continue-on-error: true   # Ne bloque pas le pipeline, le Quality Gate décide
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: python scripts/iac_scan.py
+
+      - name: Annotate IaC result
+        if: steps.checkov.outputs.exit_code == '1' || failure()
+        run: |
+          echo "::warning::Checkov a détecté des mauvaises configurations IaC."
+          echo "::warning::Consultez l'artefact report-checkov pour les détails."
+
+      - name: Upload Checkov Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-checkov
+          path: |
+            checkov-results.json
+            checkov-summary.txt
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PHASE 2 — SCANS DYNAMIQUES
 # ══════════════════════════════════════════════════════════════════════════════
@@ -142,7 +180,7 @@ jobs:
   # ── 2a. Analyse dynamique web ─────────────────────────────────────────────
   dast-scan:
     name: "🌐 DAST — OWASP ZAP"
-    needs: [secrets-scan, sast-scan, vulnerability-scan]
+    needs: [secrets-scan, sast-scan, vulnerability-scan, iac-scan]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -182,7 +220,7 @@ jobs:
   # ── 2b. Surveillance Runtime ──────────────────────────────────────────────
   falco-scan:
     name: "⚡ Runtime — Falco"
-    needs: [secrets-scan, sast-scan, vulnerability-scan]
+    needs: [secrets-scan, sast-scan, vulnerability-scan, iac-scan]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -206,41 +244,9 @@ jobs:
         with:
           name: report-falco
           path: falco-results.json
-# ── Quality Gate : Décision de déploiement ────────────────────────
-  quality-gate:
-    name: "⚖️ Quality Gate — Politique de Sécurité"
-    needs: [secrets-scan, sast-scan, vulnerability-scan, dast-scan, falco-scan]
-    runs-on: ubuntu-latest
-    if: always() # On veut le rapport même si un scan a trouvé des failles
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-          merge-multiple: true
-
-      - name: Flatten artifacts
-        run: |
-          find artifacts/ -type f -exec cp {} . \;
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Run Quality Gate
-        run: python scripts/quality_gate.py
-        continue-on-error: true
-
-      - name: Upload Quality Gate Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: quality-gate-report
-          path: quality-gate-report.txt
 # ══════════════════════════════════════════════════════════════════════════════
-# PHASE 3a — ANALYSE IA
+# PHASE 3 — ANALYSE IA + DASHBOARD (avec Matrice OWASP)
 # ══════════════════════════════════════════════════════════════════════════════
 
   ai-agent-analysis:
@@ -280,13 +286,9 @@ jobs:
           name: report-ai
           path: ai-security-summary.txt
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PHASE 3b — DASHBOARD FINAL
-# ══════════════════════════════════════════════════════════════════════════════
-
   generate-dashboard:
-    name: "📊 Dashboard — Plotly"
-    needs: [ai-agent-analysis , quality-gate]
+    name: "📊 Dashboard — Plotly + OWASP Matrix"
+    needs: ai-agent-analysis
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -333,12 +335,16 @@ jobs:
           name: DevSecOps-Final-Dashboard
           path: global_security_report.html
           retention-days: 30
-# ── Notification Slack ───────────────────────────────────────────
-  notify-slack:
-    name: "💬 Slack Notification"
-    needs: [quality-gate, generate-dashboard]
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 4 — QUALITY GATE (bloque le déploiement si seuils dépassés)
+# ══════════════════════════════════════════════════════════════════════════════
+
+  quality-gate:
+    name: "🚦 Quality Gate"
+    needs: generate-dashboard
+    if: always()
     runs-on: ubuntu-latest
-    if: always() # Indispensable pour recevoir une alerte même en cas d'échec
     steps:
       - uses: actions/checkout@v4
 
@@ -348,9 +354,61 @@ jobs:
           path: artifacts/
           merge-multiple: true
 
-      - name: Flatten artifacts
+      - name: Flatten artifacts to working directory
         run: |
-          find artifacts/ -type f -exec cp {} . \;
+          find artifacts/ -type f | while read f; do cp "$f" .; done
+          ls -lah *.json *.sarif *.txt 2>/dev/null || true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run Quality Gate
+        id: gate
+        # continue-on-error: true → la notification Slack s'envoie même si le gate échoue
+        continue-on-error: true
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: python scripts/quality_gate.py
+
+      - name: Upload Quality Gate Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-quality-gate
+          path: quality-gate-report.txt
+
+      # Bloque le pipeline si le gate a échoué (exit code 1)
+      - name: Fail if gate rejected
+        if: steps.gate.outcome == 'failure'
+        run: |
+          echo "::error::Quality Gate ÉCHOUÉ — déploiement bloqué."
+          echo "::error::Consultez l'artefact report-quality-gate pour les détails."
+          exit 1
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 5 — NOTIFICATION SLACK (toujours exécutée, même si le gate échoue)
+# ══════════════════════════════════════════════════════════════════════════════
+
+  notify-slack:
+    name: "💬 Notification — Slack"
+    needs: quality-gate
+    if: always()   # S'exécute que le pipeline ait réussi ou échoué
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Flatten artifacts to working directory
+        run: |
+          find artifacts/ -type f | while read f; do cp "$f" .; done
+          ls -lah *.json *.sarif *.txt 2>/dev/null || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -361,7 +419,9 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
-          GITHUB_RUN_URL:    ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GITHUB_ACTOR:      ${{ github.actor }}
           GITHUB_REF_NAME:   ${{ github.ref_name }}
+          GITHUB_SHA:        ${{ github.sha }}
+          GITHUB_RUN_URL:    ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: python scripts/notify_slack.py

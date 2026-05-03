@@ -152,7 +152,133 @@ def parse_ai_summary(path: str = "ai-security-summary.txt") -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. SCORE DE RISQUE GLOBAL
+# 2. PARSEUR CHECKOV (IaC)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def parse_checkov(path: str = "checkov-results.json") -> dict:
+    counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0, "passed": 0}
+    if not os.path.isfile(path):
+        print(f"[WARN] Checkov : fichier introuvable ({path})", file=sys.stderr)
+        return counts
+    try:
+        with open(path, encoding="utf-8") as fh:
+            raw = json.load(fh)
+        reports = raw if isinstance(raw, list) else [raw]
+        for report in reports:
+            summary = report.get("summary", {})
+            counts["passed"] += summary.get("passed", 0)
+            for chk in report.get("results", {}).get("failed_checks", []):
+                sev = chk.get("severity", "").capitalize()
+                if sev in counts:
+                    counts[sev] += 1
+                else:
+                    counts["Low"] += 1
+    except Exception as exc:
+        print(f"[ERROR] Checkov : {exc}", file=sys.stderr)
+    return counts
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. MATRICE OWASP TOP 10
+# ─────────────────────────────────────────────────────────────────────────────
+
+def build_owasp_matrix(trivy: dict, sonar: dict, zap: dict,
+                       falco: dict, gitleaks: int, checkov: dict) -> str:
+    """
+    Génère un tableau HTML 10 lignes × outils montrant quelles catégories
+    OWASP sont couvertes et si des findings existent.
+    """
+
+    # Mapping OWASP → (outil, présence de findings, couvert ?)
+    # covered = True  → l'outil détecte ce type de risque
+    # found   = True  → au moins un finding dans ce run
+    any_cve      = sum(trivy.values()) > 0
+    any_sast     = sonar["vulnerabilities"] > 0 or sonar["bugs"] > 0
+    any_zap      = sum(zap.values()) > 0
+    any_secrets  = gitleaks > 0
+    any_falco    = falco.get("Error", 0) + falco.get("Critical", 0) > 0
+    any_iac      = checkov.get("Critical", 0) + checkov.get("High", 0) > 0
+
+    def _cell(covered: bool, found: bool) -> str:
+        if not covered:
+            return '<td style="color:#475569;text-align:center">—</td>'
+        if found:
+            return '<td style="color:#ef4444;text-align:center;font-weight:600">⚠ Trouvé</td>'
+        return '<td style="color:#22c55e;text-align:center">✓ OK</td>'
+
+    rows = [
+        # (id,  catégorie,                        trivy,        sonar,        zap,         secrets,      falco,        checkov)
+        ("A01", "Broken Access Control",           False,        True,         True,         False,        True,         False),
+        ("A02", "Cryptographic Failures",          True,         True,         True,         True,         False,        True),
+        ("A03", "Injection",                       False,        True,         True,         False,        False,        False),
+        ("A04", "Insecure Design",                 False,        True,         True,         False,        False,        True),
+        ("A05", "Security Misconfiguration",       False,        False,        True,         False,        True,         True),
+        ("A06", "Vulnerable & Outdated Components",True,         False,        False,        False,        False,        False),
+        ("A07", "Identification & Auth Failures",  False,        True,         True,         True,         True,         False),
+        ("A08", "Software & Data Integrity Failures",True,       True,         False,        True,         False,        True),
+        ("A09", "Security Logging & Monitoring",   False,        False,        False,        False,        True,         False),
+        ("A10", "Server-Side Request Forgery",     False,        True,         True,         False,        False,        False),
+    ]
+
+    # Données de findings par outil (même ordre que les colonnes du tableau)
+    found_map = {
+        "trivy":   any_cve,
+        "sonar":   any_sast,
+        "zap":     any_zap,
+        "secrets": any_secrets,
+        "falco":   any_falco,
+        "iac":     any_iac,
+    }
+    keys = ["trivy", "sonar", "zap", "secrets", "falco", "iac"]
+    headers = ["📦 SCA<br><small>Trivy</small>",
+               "🔍 SAST<br><small>Sonar</small>",
+               "🌐 DAST<br><small>ZAP</small>",
+               "🔑 Secrets<br><small>Gitleaks</small>",
+               "⚡ Runtime<br><small>Falco</small>",
+               "🏗️ IaC<br><small>Checkov</small>"]
+
+    # Style commun
+    th = ('style="background:rgba(56,189,248,0.08);color:#7dd3fc;'
+          'font-family:\'JetBrains Mono\',monospace;font-size:.7rem;'
+          'padding:8px 6px;text-align:center;border:1px solid rgba(255,255,255,0.07)"')
+    td_id = ('style="font-family:\'JetBrains Mono\',monospace;font-size:.72rem;'
+             'color:#7dd3fc;padding:8px 10px;border:1px solid rgba(255,255,255,0.07);'
+             'font-weight:700;white-space:nowrap"')
+    td_name = ('style="font-family:\'Space Grotesk\',sans-serif;font-size:.75rem;'
+               'color:var(--muted);padding:8px 10px;border:1px solid rgba(255,255,255,0.07)"')
+    td_cell = 'style="padding:6px;border:1px solid rgba(255,255,255,0.07)"'
+
+    html = [
+        '<div style="overflow-x:auto;margin-top:8px">',
+        '<table style="width:100%;border-collapse:collapse;font-size:.75rem">',
+        '<thead><tr>',
+        f'<th {th}>ID</th>',
+        f'<th {th} style="text-align:left">Catégorie OWASP Top 10</th>',
+    ]
+    for h in headers:
+        html.append(f'<th {th}>{h}</th>')
+    html.append('</tr></thead><tbody>')
+
+    for (rid, name, *coverage) in rows:
+        html.append('<tr>')
+        html.append(f'<td {td_id}>{rid}</td>')
+        html.append(f'<td {td_name}>{name}</td>')
+        for covered, key in zip(coverage, keys):
+            found = found_map[key] if covered else False
+            if not covered:
+                html.append(f'<td {td_cell} style="color:#334155;text-align:center;padding:6px;border:1px solid rgba(255,255,255,0.07)">—</td>')
+            elif found:
+                html.append(f'<td {td_cell} style="color:#ef4444;text-align:center;font-weight:600;padding:6px;border:1px solid rgba(255,255,255,0.07)">⚠ Trouvé</td>')
+            else:
+                html.append(f'<td {td_cell} style="color:#22c55e;text-align:center;padding:6px;border:1px solid rgba(255,255,255,0.07)">✓ OK</td>')
+        html.append('</tr>')
+
+    html += ['</tbody></table></div>']
+    return "\n".join(html)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. SCORE DE RISQUE GLOBAL
 # ─────────────────────────────────────────────────────────────────────────────
 
 def compute_risk_score(trivy: dict, sonar: dict, falco: dict, gitleaks: int, zap: dict) -> dict:
@@ -190,7 +316,7 @@ def compute_risk_score(trivy: dict, sonar: dict, falco: dict, gitleaks: int, zap
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. FIGURES PLOTLY
+# 5. FIGURES PLOTLY
 # ─────────────────────────────────────────────────────────────────────────────
 
 _BG      = "rgba(0,0,0,0)"
@@ -337,7 +463,7 @@ def fig_trend() -> go.Figure:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. CONVERSION MARKDOWN → HTML
+# 6. CONVERSION MARKDOWN → HTML
 # ─────────────────────────────────────────────────────────────────────────────
 
 def md_to_html(text: str) -> str:
@@ -378,7 +504,7 @@ def md_to_html(text: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. INJECTION DES GRAPHIQUES DANS LE TEXTE IA
+# 7. INJECTION DES GRAPHIQUES DANS LE TEXTE IA
 # ─────────────────────────────────────────────────────────────────────────────
 
 _GRAPH_WRAPPER = (
@@ -421,7 +547,7 @@ def force_inject_sast(ai_html: str, sast_html: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6. GÉNÉRATION DU DASHBOARD
+# 8. GÉNÉRATION DU DASHBOARD
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_dashboard():
@@ -430,10 +556,11 @@ def generate_dashboard():
     print("═" * 60)
 
     # ── Lecture des données ───────────────────────────────────────
-    trivy_data   = parse_trivy()
-    sonar_data   = parse_sonar()
-    zap_data     = parse_zap()
-    falco_data   = parse_falco()
+    trivy_data    = parse_trivy()
+    sonar_data    = parse_sonar()
+    zap_data      = parse_zap()
+    falco_data    = parse_falco()
+    checkov_data  = parse_checkov()
     gitleaks_cnt = parse_gitleaks([
         "gitleaks-results.sarif/results.sarif",
         "gitleaks-results.sarif/gitleaks.sarif",
@@ -486,6 +613,12 @@ def generate_dashboard():
         "GRAPHIQUE_FALCO":   ai_falco,
     })
     ai_html = force_inject_sast(ai_html, ai_sast)
+
+    # ── Matrice OWASP Top 10 ──────────────────────────────────────
+    owasp_matrix = build_owasp_matrix(
+        trivy_data, sonar_data, zap_data,
+        falco_data, gitleaks_cnt, checkov_data
+    )
 
     # ── KPIs ──────────────────────────────────────────────────────
     total_cve   = sum(trivy_data.values())
@@ -587,6 +720,7 @@ def generate_dashboard():
     [data-theme="light"] .dash-header h1 {{ color: #0f172a; }}
     .dash-header h1 span {{ color: #7dd3fc; }}
     .dash-header p {{ color: var(--muted); font-size: .85rem; margin-top: 4px; }}
+=======
     .dash-header h1 span {{ color: #7dd3fc; }}
     .meta-row {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }}
     .meta-pill {{
@@ -658,19 +792,13 @@ def generate_dashboard():
       content: ''; flex: 1; height: 1px; background: var(--border);
     }}
 
-    /* ── STYLE BOÎTE IA (Texte standard, fond blanc) ── */
+    /* ── AI SECTION ── */
     .ai-box {{
-      font-family: 'Arial', sans-serif;
-      font-size: 0.9rem;
-      line-height: 1.6;
-      color: #334155;             /* Texte gris foncé, très lisible */
-      background-color: #ffffff;   /* Fond blanc */
-      padding: 20px;
-      border-radius: 8px;
-      border: 1px solid #e2e8f0;   /* Bordure subtile */
-      border-left: 5px solid #64748b; /* Liseré gris gauche */
-      white-space: pre-wrap;       /* Garde les sauts de ligne */
-      margin-top: 10px;
+      background: linear-gradient(135deg, rgba(6,182,212,.04) 0%, rgba(99,102,241,.04) 100%);
+      border: 1px solid rgba(6,182,212,.15);
+      border-radius: 12px; padding: 24px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: .75rem; color: var(--muted); line-height: 1.75;
     }}
     .ai-badge {{
       font-size: .7rem; background: rgba(6,182,212,.15); color: var(--accent);
@@ -766,8 +894,14 @@ def generate_dashboard():
       <div class="kpi-val" style="color:{'#22c55e' if risk['score']<40 else '#ef4444'}">{risk['score']}</div>
       <div class="kpi-lbl">🎯 Score Risque Global</div>
     </div>
+    <div class="kpi">
+      <div class="kpi-val" style="color:{'#ef4444' if checkov_data.get('Critical',0)+checkov_data.get('High',0)>0 else '#22c55e'}">{checkov_data.get('Critical',0)+checkov_data.get('High',0)}</div>
+      <div class="kpi-lbl">🏗️ Issues IaC (Checkov)</div>
+    </div>
   </div>
 
+  <!-- ── GRAPHIQUES 3+3 ── -->
+=======
   <!-- ── GRAPHIQUES 3 + 3 ── -->
   <div class="section-label">Graphiques de sécurité</div>
   <div class="row g-3 mb-3">
@@ -793,6 +927,7 @@ def generate_dashboard():
       </div>
     </div>
   </div>
+=======
 
   <div class="row g-3 mb-4">
     <div class="col-md-4">
@@ -824,6 +959,7 @@ def generate_dashboard():
     <div class="card-title">
       🤖 Rapport IA Corrélé
       <span class="ai-badge">SCA · SAST · DAST · Runtime · Secrets</span>
+=======
   <!-- ── AI SUMMARY ── -->
   <div class="section-label">Synthèse Intelligence Artificielle</div>
   <div class="card-dark mb-4">
@@ -834,6 +970,21 @@ def generate_dashboard():
       </span>
     </div>
     <div class="ai-box">{ai_html}</div>
+  </div>
+
+  <!-- ── MATRICE OWASP TOP 10 ── -->
+  <div class="section-label">Couverture OWASP Top 10</div>
+  <div class="card-dark mb-4">
+    <div class="card-title">
+      🛡️ Matrice de Couverture OWASP Top 10
+      <span class="ai-badge">6 outils · 10 catégories</span>
+    </div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:.73rem;color:var(--muted);margin-bottom:12px">
+      Légende : <span style="color:#22c55e">✓ OK</span> — outil couvre cette catégorie, aucun finding &nbsp;|&nbsp;
+      <span style="color:#ef4444">⚠ Trouvé</span> — finding(s) détecté(s) &nbsp;|&nbsp;
+      <span style="color:#334155">—</span> — catégorie non couverte par cet outil
+    </div>
+    {owasp_matrix}
   </div>
 
   <footer>
