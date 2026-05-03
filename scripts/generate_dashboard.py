@@ -584,13 +584,11 @@ def generate_dashboard():
       font-size: 1.6rem; font-weight: 700; letter-spacing: .04em;
       color: #f8fafc;
     }}
-<<<<<<< HEAD
     [data-theme="light"] .dash-header h1 {{ color: #0f172a; }}
     .dash-header h1 span {{ color: #7dd3fc; }}
     .dash-header p {{ color: var(--muted); font-size: .85rem; margin-top: 4px; }}
 =======
     .dash-header h1 span {{ color: #7dd3fc; }}
->>>>>>> 84a218a42b4c58c79a268a5e248da315af039e3d
     .meta-row {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }}
     .meta-pill {{
       background: rgba(255,255,255,.06); border: 1px solid var(--border);
@@ -683,7 +681,19 @@ def generate_dashboard():
     .ai-box strong {{ color: #fbbf24; }}
     .ai-box ul {{ padding-left: 20px; }}
     .ai-box li {{ margin-bottom: 6px; }}
-
+    /* ── STYLE BOÎTE IA ── */
+    .ai-box {{
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 0.85rem;
+      line-height: 1.7;
+      color: #e2e8f0;
+      background-color: var(--surface);
+      padding: 24px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      border-left: 4px solid #8b5cf6; /* Liseré violet (couleur IA) */
+      white-space: pre-wrap; /* Garde les sauts de ligne de l'IA */
+    }}
     /* ── NOTE BOX ── */
     .note {{
       background: rgba(255,255,255,.03); border-left: 2px solid rgba(148,163,184,.3);
@@ -764,12 +774,10 @@ def generate_dashboard():
       <div class="kpi-lbl">🎯 Score Risque Global</div>
     </div>
   </div>
-<<<<<<< HEAD
 
   <!-- ── GRAPHIQUES 3+3 ── -->
 =======
   <!-- ── GRAPHIQUES 3 + 3 ── -->
->>>>>>> 84a218a42b4c58c79a268a5e248da315af039e3d
   <div class="section-label">Graphiques de sécurité</div>
   <div class="row g-3 mb-3">
     <div class="col-md-4">
@@ -794,10 +802,8 @@ def generate_dashboard():
       </div>
     </div>
   </div>
-<<<<<<< HEAD
 =======
 
->>>>>>> 84a218a42b4c58c79a268a5e248da315af039e3d
   <div class="row g-3 mb-4">
     <div class="col-md-4">
       <div class="card-dark h-100">
@@ -822,7 +828,6 @@ def generate_dashboard():
     </div>
   </div>
 
-<<<<<<< HEAD
   <!-- ── RAPPORT IA ── -->
   <div class="section-label">Synthèse Intelligence Artificielle</div>
   <div class="card-dark mb-4">
@@ -838,7 +843,6 @@ def generate_dashboard():
                    padding:2px 10px;border-radius:10px;margin-left:auto">
         SCA · SAST · DAST · Runtime · Secrets
       </span>
->>>>>>> 84a218a42b4c58c79a268a5e248da315af039e3d
     </div>
     <div class="ai-box">{ai_html}</div>
   </div>
