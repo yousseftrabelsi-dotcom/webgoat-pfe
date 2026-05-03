@@ -206,7 +206,38 @@ jobs:
         with:
           name: report-falco
           path: falco-results.json
+# ── Quality Gate : Décision de déploiement ────────────────────────
+  quality-gate:
+    name: "⚖️ Quality Gate — Politique de Sécurité"
+    needs: [secrets-scan, sast-scan, sca-scan, zap-scan, falco-scan]
+    runs-on: ubuntu-latest
+    if: always() # On veut le rapport même si un scan a trouvé des failles
+    steps:
+      - uses: actions/checkout@v4
 
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Flatten artifacts
+        run: |
+          find artifacts/ -type f -exec cp {} . \;
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run Quality Gate
+        run: python scripts/quality_gate.py
+
+      - name: Upload Quality Gate Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-gate-report
+          path: quality-gate-report.txt
 # ══════════════════════════════════════════════════════════════════════════════
 # PHASE 3a — ANALYSE IA
 # ══════════════════════════════════════════════════════════════════════════════
@@ -301,3 +332,32 @@ jobs:
           name: DevSecOps-Final-Dashboard
           path: global_security_report.html
           retention-days: 30
+# ── Notification Slack ───────────────────────────────────────────
+  notify-slack:
+    name: "💬 Slack Notification"
+    needs: [quality-gate, dashboard]
+    runs-on: ubuntu-latest
+    if: always() # Indispensable pour recevoir une alerte même en cas d'échec
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Flatten artifacts
+        run: |
+          find artifacts/ -type f -exec cp {} . \;
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Send Slack Notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: python scripts/notify_slack.py
