@@ -579,7 +579,7 @@ def generate_dashboard():
       letter-spacing: .04em;
       color: #f8fafc;
     }}
-    .dash-header h1 span {{ color: var(--accent); }}
+    .dash-header h1 span {{ color: #7dd3fc; }}
     .meta-row {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }}
     .meta-pill {{
       background: rgba(255,255,255,0.06);
@@ -906,19 +906,8 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
       <div class="kpi-lbl">🎯 Score Risque Global</div>
     </div>
   </div>
-  <!-- ── AI SUMMARY ── -->
-  <div class="section-label">Synthèse Intelligence Artificielle</div>
-  <div class="card-dark mb-4">
-    <div class="card-title">🤖 Rapport IA Corrélé
-      <span style="font-size:.7rem;background:rgba(6,182,212,0.15);color:var(--accent);
-                   padding:2px 10px;border-radius:10px;margin-left:auto">
-        SCA · SAST · DAST · Runtime · Secrets
-      </span>
-    </div>
-    <div class="ai-box">{ai_html}</div>
-  </div>
-
   <!-- ── GRAPHIQUES 3 + 3 ── -->
+  <div class="section-label">Graphiques de sécurité</div>
   <div class="row g-3 mb-3">
     <div class="col-md-4">
       <div class="card-dark h-100">
@@ -943,7 +932,7 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
     </div>
   </div>
 
-  <div class="row g-3">
+  <div class="row g-3 mb-4">
     <div class="col-md-4">
       <div class="card-dark h-100">
         <div class="card-title">⚡ Runtime (Falco)</div>
@@ -965,6 +954,18 @@ body {{ background: var(--bg) !important; color: var(--text) !important; }}
         <div class="note">Réduction progressive des vulnérabilités au fil des pipelines.</div>
       </div>
     </div>
+  </div>
+
+  <!-- ── AI SUMMARY ── -->
+  <div class="section-label">Synthèse Intelligence Artificielle</div>
+  <div class="card-dark mb-4">
+    <div class="card-title">🤖 Rapport IA Corrélé
+      <span style="font-size:.7rem;background:rgba(6,182,212,0.15);color:var(--accent);
+                   padding:2px 10px;border-radius:10px;margin-left:auto">
+        SCA · SAST · DAST · Runtime · Secrets
+      </span>
+    </div>
+    <div class="ai-box">{ai_html}</div>
   </div>
 
   <footer>
