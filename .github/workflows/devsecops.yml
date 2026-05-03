@@ -209,7 +209,7 @@ jobs:
 # ── Quality Gate : Décision de déploiement ────────────────────────
   quality-gate:
     name: "⚖️ Quality Gate — Politique de Sécurité"
-    needs: [secrets-scan, sast-scan, sca-scan, zap-scan, falco-scan]
+    needs: [secrets-scan, sast-scan, vulnerability-scan, dast-scan, falco-scan]
     runs-on: ubuntu-latest
     if: always() # On veut le rapport même si un scan a trouvé des failles
     steps:
