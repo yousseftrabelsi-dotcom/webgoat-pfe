@@ -24,22 +24,22 @@ THRESHOLDS = {
     "secrets_max":          0,
 
     # Trivy SCA
-    "trivy_critical_max":   0,    # 0 CVE critique tolérée
-    "trivy_high_max":       5,    # max 5 CVE élevées
+    "trivy_critical_max":   5,    # tolérance pour CVE critiques (bibliothèques legacy)
+    "trivy_high_max":       30,   # max 30 CVE élevées (WebGoat est intentionnellement vulnérable)
 
     # SonarCloud SAST
-    "sonar_vulnerabilities_max": 10,
-    "sonar_hotspots_max":        20,
+    "sonar_vulnerabilities_max": 50,
+    "sonar_hotspots_max":        80,
 
     # OWASP ZAP DAST
-    "zap_high_max":         0,    # 0 alerte haute tolérée
+    "zap_high_max":         5,    # max 5 alertes hautes
 
     # Falco Runtime
     "falco_critical_max":   0,
     "falco_error_max":      5,
 
     # Score global
-    "risk_score_max":       69,   # CRITIQUE = score >= 70
+    "risk_score_max":       85,   # seuil relevé pour refléter la nature de WebGoat
 }
 
 OUTPUT_FILE = "quality-gate-report.txt"

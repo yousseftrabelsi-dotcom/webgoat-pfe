@@ -796,9 +796,10 @@ def generate_dashboard():
     .ai-box {{
       background: linear-gradient(135deg, rgba(6,182,212,.04) 0%, rgba(99,102,241,.04) 100%);
       border: 1px solid rgba(6,182,212,.15);
-      border-radius: 12px; padding: 24px;
+      border-radius: 12px; padding: 28px 36px;
       font-family: 'Space Grotesk', sans-serif;
-      font-size: .75rem; color: var(--muted); line-height: 1.75;
+      font-size: .95rem; color: var(--muted); line-height: 1.85;
+      max-width: 100%; width: 100%;
     }}
     .ai-badge {{
       font-size: .7rem; background: rgba(6,182,212,.15); color: var(--accent);
@@ -953,25 +954,6 @@ def generate_dashboard():
     </div>
   </div>
 
-  <!-- ── RAPPORT IA ── -->
-  <div class="section-label">Synthèse Intelligence Artificielle</div>
-  <div class="card-dark mb-4">
-    <div class="card-title">
-      🤖 Rapport IA Corrélé
-      <span class="ai-badge">SCA · SAST · DAST · Runtime · Secrets</span>
-=======
-  <!-- ── AI SUMMARY ── -->
-  <div class="section-label">Synthèse Intelligence Artificielle</div>
-  <div class="card-dark mb-4">
-    <div class="card-title">🤖 Rapport IA Corrélé
-      <span style="font-size:.7rem;background:rgba(6,182,212,0.15);color:var(--accent);
-                   padding:2px 10px;border-radius:10px;margin-left:auto">
-        SCA · SAST · DAST · Runtime · Secrets
-      </span>
-    </div>
-    <div class="ai-box">{ai_html}</div>
-  </div>
-
   <!-- ── MATRICE OWASP TOP 10 ── -->
   <div class="section-label">Couverture OWASP Top 10</div>
   <div class="card-dark mb-4">
@@ -985,6 +967,18 @@ def generate_dashboard():
       <span style="color:#334155">—</span> — catégorie non couverte par cet outil
     </div>
     {owasp_matrix}
+  </div>
+
+  <!-- ── RAPPORT IA ── -->
+  <div class="section-label">Synthèse Intelligence Artificielle</div>
+  <div class="card-dark mb-4" style="max-width:100%">
+    <div class="card-title">🤖 Rapport IA Corrélé
+      <span style="font-size:.7rem;background:rgba(6,182,212,0.15);color:var(--accent);
+                   padding:2px 10px;border-radius:10px;margin-left:auto">
+        SCA · SAST · DAST · Runtime · Secrets
+      </span>
+    </div>
+    <div class="ai-box">{ai_html}</div>
   </div>
 
   <footer>
