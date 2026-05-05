@@ -1,7 +1,7 @@
 """
 scripts/notify_slack.py
 ──────────────────────────────────────────────────────────────────────────────
-Notification Slack — envoie un résumé du pipeline DevSecOps après chaque run.
+Notification Slack : envoie un résumé du pipeline DevSecOps après chaque run.
 Lit les rapports disponibles et poste un message structuré avec blocs Slack.
 
 Variable d'environnement requise :
