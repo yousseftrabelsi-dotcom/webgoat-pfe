@@ -22,7 +22,7 @@ OUTPUT_FILE  = "ai-security-summary.txt"
 MAX_CHARS    = 12_000
 MAX_RETRIES  = 5
 RETRY_DELAY  = 30
-GEMINI_MODEL = "gemini-2.0-flash"   # 2.0-flash : plus stable que 2.5-flash
+GEMINI_MODEL = "gemini-2.5-flash"   # 2.5-flash
 
 # Rapports à intégrer — IaC Checkov ajouté
 REPORTS = {
