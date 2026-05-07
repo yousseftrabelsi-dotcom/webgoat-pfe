@@ -19,9 +19,9 @@ from google import genai
 # ─────────────────────────────────────────────────────────────────────────────
 
 OUTPUT_FILE  = "ai-security-summary.txt"
-MAX_CHARS    = 15_000      # limite par rapport pour ne pas saturer l'API
-MAX_RETRIES  = 3
-RETRY_DELAY  = 15          # secondes entre deux tentatives
+MAX_CHARS    = 10_000      # limite par rapport pour ne pas saturer l'API
+MAX_RETRIES  = 5
+RETRY_DELAY  = 30          # secondes entre deux tentatives
 GEMINI_MODEL = "gemini-2.5-flash"
 
 # Rapports à intégrer — ordre = ordre d'apparition dans le prompt
