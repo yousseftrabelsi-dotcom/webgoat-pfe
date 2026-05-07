@@ -22,17 +22,24 @@ OUTPUT_FILE  = "ai-security-summary.txt"
 MAX_CHARS    = 12_000
 MAX_RETRIES  = 5
 RETRY_DELAY  = 30
-GEMINI_MODEL = "gemini-2.5-flash"   # 2.5-flash
+GEMINI_MODEL = "gemini-2.5-flash"   # 2.5-flash 
 
 # Rapports à intégrer — IaC Checkov ajouté
 REPORTS = {
     "Trivy / SCA — Dépendances":       "trivy-results.json",
     "SonarCloud / SAST — Code source": "sonar-results.json",
-    "OWASP ZAP / DAST — Web":          "report_html.html",
+    "OWASP ZAP / DAST — Web":          "report_json.json",   # JSON = alertes réelles
     "Gitleaks / Secrets":              "results.sarif",
     "Falco / Runtime":                 "falco-results.json",
-    "Checkov / IaC — Infrastructure":  "checkov-results.json",   # ← NOUVEAU
 }
+
+# Checkov : plusieurs noms possibles selon la version de iac_scan.py
+CHECKOV_CANDIDATES = [
+    "checkov-results.json",
+    "checkov_results.json",
+    "checkov-report.json",
+    "results_json.json",
+]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -69,6 +76,109 @@ def _extract_sonar_kpis(path: str) -> str:
         return "\n".join(lines) if len(lines) > 1 else ""
     except Exception as exc:
         print(f"  [WARN] Lecture SonarCloud : {exc}", file=sys.stderr)
+        return ""
+
+
+def _extract_zap_kpis(path: str) -> str:
+    """
+    Extrait les alertes ZAP depuis report_json.json et les formate
+    en texte lisible — évite d'envoyer le JSON brut volumineux à Gemini.
+    """
+    import json
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+
+        lines = ["Résultats OWASP ZAP DAST :"]
+        total_alerts = 0
+
+        for site in data.get("site", []):
+            site_name = site.get("@name", site.get("@host", "inconnu"))
+            alerts = site.get("alerts", [])
+            lines.append(f"\n  Site scanné : {site_name}")
+            lines.append(f"  Nombre d'alertes : {len(alerts)}")
+
+            # Grouper par niveau de risque
+            by_risk = {"High": [], "Medium": [], "Low": [], "Informational": []}
+            for alert in alerts:
+                risk = alert.get("riskdesc", "").split(" ")[0]
+                if risk in by_risk:
+                    by_risk[risk].append(alert)
+                total_alerts += 1
+
+            for risk_level, alert_list in by_risk.items():
+                if not alert_list:
+                    continue
+                lines.append(f"\n  🔴 {risk_level} ({len(alert_list)} alertes) :")
+                for a in alert_list[:5]:   # max 5 par niveau
+                    name = a.get("alert", a.get("name", "—"))
+                    desc = a.get("desc", "")[:120].replace("\n", " ")
+                    lines.append(f"    - {name}")
+                    if desc:
+                        lines.append(f"      {desc}")
+                if len(alert_list) > 5:
+                    lines.append(f"    … et {len(alert_list)-5} autres alertes {risk_level}")
+
+        lines.append(f"\n  Total alertes détectées : {total_alerts}")
+        return "\n".join(lines) if total_alerts > 0 else ""
+
+    except Exception as exc:
+        print(f"  [WARN] Lecture ZAP JSON : {exc}", file=sys.stderr)
+        return ""
+
+
+def _extract_gitleaks_kpis(path: str) -> str:
+    """
+    Extrait les secrets détectés depuis results.sarif et les formate
+    en texte structuré pour Gemini — évite d'envoyer le SARIF brut complet.
+    """
+    import json
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+
+        results = []
+        if isinstance(data, list):
+            results = data
+        elif "runs" in data:
+            results = data["runs"][0].get("results", [])
+
+        count = len(results)
+        lines = [f"Résultats Gitleaks — Secrets détectés : {count}"]
+
+        if count == 0:
+            lines.append("  ✅ Aucun secret en clair détecté dans le dépôt.")
+            return "\n".join(lines)
+
+        lines.append(f"  ⚠️  {count} secret(s) en clair détecté(s) — CRITIQUE")
+        lines.append("\n  Détail des secrets (max 15) :")
+
+        # Grouper par type de règle
+        by_rule = {}
+        for r in results:
+            rule_id = r.get("ruleId", "unknown")
+            msg     = r.get("message", {}).get("text", "—")[:80]
+            loc     = ""
+            locs    = r.get("locations", [])
+            if locs:
+                phys = locs[0].get("physicalLocation", {})
+                loc  = phys.get("artifactLocation", {}).get("uri", "—")
+
+            if rule_id not in by_rule:
+                by_rule[rule_id] = []
+            by_rule[rule_id].append({"msg": msg, "file": loc})
+
+        for rule_id, findings in list(by_rule.items())[:10]:
+            lines.append(f"\n  [{rule_id}] — {len(findings)} occurrence(s) :")
+            for f in findings[:3]:
+                lines.append(f"    Fichier : {f['file']}")
+                lines.append(f"    Message : {f['msg']}")
+
+        lines.append(f"\n  Impact : déploiement BLOQUÉ — score de risque = 100/100")
+        return "\n".join(lines)
+
+    except Exception as exc:
+        print(f"  [WARN] Lecture Gitleaks SARIF : {exc}", file=sys.stderr)
         return ""
 
 
@@ -158,12 +268,21 @@ def build_context() -> str:
                 )
                 continue
 
-        # Traitement spécifique Checkov  ← NOUVEAU
-        if "checkov" in filepath.lower():
-            checkov_text = _extract_checkov_kpis(filepath)
-            if checkov_text:
+        # Traitement spécifique ZAP — JSON alertes
+        if "report_json" in filepath.lower() or "zap" in filepath.lower():
+            zap_text = _extract_zap_kpis(filepath)
+            if zap_text:
                 context_parts.append(
-                    f"\n\n=== RÉSULTATS {label.upper()} ===\n{checkov_text}\n"
+                    f"\n\n=== RÉSULTATS {label.upper()} ===\n{zap_text}\n"
+                )
+                continue
+
+        # Traitement spécifique Gitleaks — SARIF complet → résumé structuré
+        if "results.sarif" in filepath.lower() or "gitleaks" in filepath.lower():
+            gl_text = _extract_gitleaks_kpis(filepath)
+            if gl_text:
+                context_parts.append(
+                    f"\n\n=== RÉSULTATS {label.upper()} ===\n{gl_text}\n"
                 )
                 continue
 
@@ -175,6 +294,18 @@ def build_context() -> str:
             )
         except Exception as exc:
             print(f"  [ERROR] Lecture {filepath} : {exc}", file=sys.stderr)
+
+    # ── Checkov IaC : recherche parmi plusieurs noms de fichiers ──
+    checkov_file = next((p for p in CHECKOV_CANDIDATES if os.path.exists(p)), None)
+    if checkov_file:
+        print(f"  [OK]   Intégration : Checkov / IaC — Infrastructure ({checkov_file})")
+        checkov_text = _extract_checkov_kpis(checkov_file)
+        if checkov_text:
+            context_parts.append(
+                f"\n\n=== RÉSULTATS CHECKOV / IAC — INFRASTRUCTURE ===\n{checkov_text}\n"
+            )
+    else:
+        print(f"  [SKIP] Checkov / IaC — aucun fichier trouvé parmi : {CHECKOV_CANDIDATES}")
 
     return "".join(context_parts)
 
