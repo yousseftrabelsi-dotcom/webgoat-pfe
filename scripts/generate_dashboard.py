@@ -619,20 +619,22 @@ def generate_dashboard():
     }
 
     # ── Figures Plotly ────────────────────────────────────────────
-    f_sca   = fig_sca(trivy_data)
-    f_sast  = fig_sast(sonar_data)
-    f_dast  = fig_dast(zap_data)
-    f_falco = fig_falco(falco_data)
-    f_sec   = fig_secrets(gitleaks_cnt)
-    f_trend = fig_trend()
+    f_sca     = fig_sca(trivy_data)
+    f_sast    = fig_sast(sonar_data)
+    f_dast    = fig_dast(zap_data)
+    f_falco   = fig_falco(falco_data)
+    f_sec     = fig_secrets(gitleaks_cnt)
+    f_trend   = fig_trend()
+    f_checkov = fig_checkov(checkov_data)
 
     # Grille principale (dashboard)
-    g_sca   = f_sca.to_html(full_html=False, include_plotlyjs=False)
-    g_sast  = f_sast.to_html(full_html=False, include_plotlyjs=False)
-    g_dast  = f_dast.to_html(full_html=False, include_plotlyjs=False)
-    g_falco = f_falco.to_html(full_html=False, include_plotlyjs=False)
-    g_sec   = f_sec.to_html(full_html=False, include_plotlyjs=False)
-    g_trend = f_trend.to_html(full_html=False, include_plotlyjs=False)
+    g_sca     = f_sca.to_html(full_html=False, include_plotlyjs=False)
+    g_sast    = f_sast.to_html(full_html=False, include_plotlyjs=False)
+    g_dast    = f_dast.to_html(full_html=False, include_plotlyjs=False)
+    g_falco   = f_falco.to_html(full_html=False, include_plotlyjs=False)
+    g_sec     = f_sec.to_html(full_html=False, include_plotlyjs=False)
+    g_trend   = f_trend.to_html(full_html=False, include_plotlyjs=False)
+    g_checkov = f_checkov.to_html(full_html=False, include_plotlyjs=False)
 
     # Copies dédiées au rapport IA (IDs Plotly distincts)
     ai_sca     = f_sca.to_html(full_html=False, include_plotlyjs=False)
@@ -640,7 +642,7 @@ def generate_dashboard():
     ai_dast    = f_dast.to_html(full_html=False, include_plotlyjs=False)
     ai_falco   = f_falco.to_html(full_html=False, include_plotlyjs=False)
     ai_sec     = f_sec.to_html(full_html=False, include_plotlyjs=False)
-    ai_checkov = fig_checkov(checkov_data).to_html(full_html=False, include_plotlyjs=False)
+    ai_checkov = f_checkov.to_html(full_html=False, include_plotlyjs=False)
 
     # ── Rapport IA : Markdown → HTML + graphiques ─────────────────
     ai_html = md_to_html(ai_raw)
@@ -836,9 +838,13 @@ def generate_dashboard():
     .ai-box {{
       background: linear-gradient(135deg, rgba(6,182,212,.04) 0%, rgba(99,102,241,.04) 100%);
       border: 1px solid rgba(6,182,212,.15);
-      border-radius: 12px; padding: 24px;
+      border-radius: 12px; padding: 28px 36px;
       font-family: 'Space Grotesk', sans-serif;
-      font-size: .75rem; color: var(--muted); line-height: 1.75;
+      font-size: .88rem; color: var(--muted); line-height: 1.85;
+    }}
+    .ai-wrapper {{
+      max-width: 900px;
+      margin: 0 auto;
     }}
     .ai-badge {{
       font-size: .7rem; background: rgba(6,182,212,.15); color: var(--accent);
@@ -940,10 +946,21 @@ def generate_dashboard():
     </div>
   </div>
 
-  <!-- ── GRAPHIQUES 3+3 ── -->
-=======
-  <!-- ── GRAPHIQUES 3 + 3 ── -->
+  <!-- ── GRAPHIQUES DE SÉCURITÉ ── -->
   <div class="section-label">Graphiques de sécurité</div>
+
+  <!-- Tendance centré au-dessus des 6 graphes -->
+  <div class="row g-3 mb-3 justify-content-center">
+    <div class="col-md-6">
+      <div class="card-dark h-100">
+        <div class="card-title">📈 Tendance Sécurité</div>
+        {g_trend}
+        <div class="note">Réduction progressive des vulnérabilités sur les derniers runs.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ligne 1 : SCA · SAST · DAST -->
   <div class="row g-3 mb-3">
     <div class="col-md-4">
       <div class="card-dark h-100">
@@ -967,8 +984,8 @@ def generate_dashboard():
       </div>
     </div>
   </div>
-=======
 
+  <!-- Ligne 2 : Falco · Secrets · IaC -->
   <div class="row g-3 mb-4">
     <div class="col-md-4">
       <div class="card-dark h-100">
@@ -986,30 +1003,22 @@ def generate_dashboard():
     </div>
     <div class="col-md-4">
       <div class="card-dark h-100">
-        <div class="card-title">📈 Tendance Sécurité</div>
-        {g_trend}
-        <div class="note">Réduction progressive des vulnérabilités.</div>
+        <div class="card-title">🏗️ IaC — Checkov</div>
+        {g_checkov}
+        <div class="note">Misconfigurations détectées dans les fichiers IaC.</div>
       </div>
     </div>
   </div>
 
-  <!-- ── RAPPORT IA ── -->
+  <!-- ── SYNTHÈSE IA ── -->
   <div class="section-label">Synthèse Intelligence Artificielle</div>
-  <div class="card-dark mb-4">
-    <div class="card-title">
-      🤖 Rapport IA Corrélé
-      <span class="ai-badge">SCA · SAST · DAST · Runtime · Secrets</span>
-=======
-  <!-- ── AI SUMMARY ── -->
-  <div class="section-label">Synthèse Intelligence Artificielle</div>
-  <div class="card-dark mb-4">
-    <div class="card-title">🤖 Rapport IA Corrélé
-      <span style="font-size:.7rem;background:rgba(6,182,212,0.15);color:var(--accent);
-                   padding:2px 10px;border-radius:10px;margin-left:auto">
-        SCA · SAST · DAST · Runtime · Secrets
-      </span>
+  <div class="ai-wrapper mb-4">
+    <div class="card-dark">
+      <div class="card-title">🤖 Rapport IA Corrélé
+        <span class="ai-badge">SCA · SAST · DAST · Runtime · Secrets · IaC</span>
+      </div>
+      <div class="ai-box">{ai_html}</div>
     </div>
-    <div class="ai-box">{ai_html}</div>
   </div>
 
   <!-- ── MATRICE OWASP TOP 10 ── -->
