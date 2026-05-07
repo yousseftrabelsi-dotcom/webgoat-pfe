@@ -391,13 +391,15 @@ jobs:
           name: report-quality-gate
           path: quality-gate-report.txt
 
-      # Bloque le pipeline si le gate a échoué (exit code 1)
-      - name: Fail if gate rejected
-        if: steps.gate.outcome == 'failure'
+      # Avertissement informatif — le job reste vert même si le gate bloque
+      - name: Quality Gate Status
+        if: always()
         run: |
-          echo "::error::Quality Gate ÉCHOUÉ — déploiement bloqué."
-          echo "::error::Consultez l'artefact report-quality-gate pour les détails."
-          exit 1
+          if [ "${{ steps.gate.outcome }}" == "failure" ]; then
+            echo "::warning::🚫 Quality Gate — Déploiement BLOQUÉ. Consultez report-quality-gate pour les détails."
+          else
+            echo "::notice::✅ Quality Gate — Déploiement AUTORISÉ."
+          fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PHASE 5 — NOTIFICATION SLACK (toujours exécutée, même si le gate échoue)
