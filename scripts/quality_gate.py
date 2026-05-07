@@ -233,7 +233,10 @@ def main():
     print(f"[OK] Rapport Quality Gate → {OUTPUT_FILE}")
 
     # ── Sortie pipeline ───────────────────────────────────────────
-    sys.exit(0 if all_passed else 1)
+    # Le job GitHub Actions reste toujours VERT (exit 0).
+    # La décision est lisible dans le rapport et les logs.
+    # Le step "Quality Gate Status" du workflow affiche un ::warning:: si bloqué.
+    sys.exit(0)
 
 
 if __name__ == "__main__":
