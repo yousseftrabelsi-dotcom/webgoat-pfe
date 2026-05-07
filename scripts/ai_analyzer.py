@@ -2,8 +2,8 @@
 scripts/ai_analyzer.py
 ──────────────────────────────────────────────────────────────────────────────
 Analyse IA corrélée — Pipeline DevSecOps WebGoat
-Agrège les rapports SCA · SAST · DAST · Secrets · Runtime et génère
-une synthèse Markdown enrichie via Gemini-2.5-Flash.
+Agrège les rapports SCA · SAST · DAST · Secrets · Runtime · IaC et génère
+une synthèse Markdown enrichie via Gemini.
 ──────────────────────────────────────────────────────────────────────────────
 """
 
@@ -19,18 +19,19 @@ from google import genai
 # ─────────────────────────────────────────────────────────────────────────────
 
 OUTPUT_FILE  = "ai-security-summary.txt"
-MAX_CHARS    = 12_000      # limite par rapport pour ne pas saturer l'API
+MAX_CHARS    = 12_000
 MAX_RETRIES  = 5
-RETRY_DELAY  = 30          # secondes entre deux tentatives
-GEMINI_MODEL = "gemini-2.5-flash"
+RETRY_DELAY  = 30
+GEMINI_MODEL = "gemini-2.0-flash"   # 2.0-flash : plus stable que 2.5-flash
 
-# Rapports à intégrer — ordre = ordre d'apparition dans le prompt
+# Rapports à intégrer — IaC Checkov ajouté
 REPORTS = {
     "Trivy / SCA — Dépendances":       "trivy-results.json",
     "SonarCloud / SAST — Code source": "sonar-results.json",
     "OWASP ZAP / DAST — Web":          "report_html.html",
     "Gitleaks / Secrets":              "results.sarif",
     "Falco / Runtime":                 "falco-results.json",
+    "Checkov / IaC — Infrastructure":  "checkov-results.json",   # ← NOUVEAU
 }
 
 
@@ -44,36 +45,93 @@ def _write_output(text: str) -> None:
 
 
 def _extract_sonar_kpis(path: str) -> str:
-    """
-    Extrait les KPIs SonarCloud depuis sonar-results.json et les formate
-    en texte lisible par le LLM (évite d'envoyer du JSON brut volumineux).
-    """
     import json
     try:
         with open(path, encoding="utf-8") as fh:
             raw = json.load(fh)
         measures = raw.get("component", {}).get("measures", [])
         kpis = {m["metric"]: m.get("value", "N/A") for m in measures}
-
         lines = ["Métriques SonarCloud extraites :"]
         mapping = {
-            "bugs":                    "🐛  Bugs",
-            "vulnerabilities":         "🔓  Vulnérabilités",
-            "security_hotspots":       "🔥  Hotspots de sécurité",
-            "code_smells":             "🧹  Code smells",
-            "coverage":                "🧪  Couverture de tests (%)",
-            "duplicated_lines_density":"📋  Duplication (%)",
-            "sqale_rating":            "📐  Note maintenabilité (A-E)",
-            "reliability_rating":      "🛡️  Note fiabilité (A-E)",
-            "security_rating":         "🔒  Note sécurité (A-E)",
+            "bugs":                     "🐛  Bugs",
+            "vulnerabilities":          "🔓  Vulnérabilités",
+            "security_hotspots":        "🔥  Hotspots de sécurité",
+            "code_smells":              "🧹  Code smells",
+            "coverage":                 "🧪  Couverture de tests (%)",
+            "duplicated_lines_density": "📋  Duplication (%)",
+            "sqale_rating":             "📐  Note maintenabilité (A-E)",
+            "reliability_rating":       "🛡️  Note fiabilité (A-E)",
+            "security_rating":          "🔒  Note sécurité (A-E)",
         }
         for metric, label in mapping.items():
             if metric in kpis:
                 lines.append(f"  {label} : {kpis[metric]}")
-
         return "\n".join(lines) if len(lines) > 1 else ""
     except Exception as exc:
         print(f"  [WARN] Lecture SonarCloud : {exc}", file=sys.stderr)
+        return ""
+
+
+def _extract_checkov_kpis(path: str) -> str:
+    """
+    Extrait un résumé lisible du rapport Checkov JSON.
+    Évite d'envoyer tout le JSON brut à Gemini.
+    """
+    import json
+    try:
+        with open(path, encoding="utf-8") as fh:
+            raw = json.load(fh)
+
+        reports = raw if isinstance(raw, list) else [raw]
+        total_passed = 0
+        total_failed = 0
+        severities   = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+        failed_checks = []
+
+        for report in reports:
+            summary = report.get("summary", {})
+            total_passed += summary.get("passed", 0)
+            total_failed += summary.get("failed", 0)
+
+            for chk in report.get("results", {}).get("failed_checks", []):
+                sev = chk.get("severity", "LOW").upper()
+                if sev in severities:
+                    severities[sev] += 1
+                else:
+                    severities["LOW"] += 1
+
+                # Garde les 10 premiers checks échoués pour contexte IA
+                if len(failed_checks) < 10:
+                    failed_checks.append({
+                        "id":       chk.get("check_id", "—"),
+                        "name":     chk.get("check", {}).get("name", chk.get("check_id", "—")),
+                        "severity": sev,
+                        "file":     chk.get("repo_file_path", chk.get("file_path", "—")),
+                        "resource": chk.get("resource", "—"),
+                    })
+
+        lines = [
+            "Résumé Checkov IaC :",
+            f"  ✅ Checks passés   : {total_passed}",
+            f"  ❌ Checks échoués  : {total_failed}",
+            f"  🔴 CRITICAL        : {severities['CRITICAL']}",
+            f"  🟠 HIGH            : {severities['HIGH']}",
+            f"  🟡 MEDIUM          : {severities['MEDIUM']}",
+            f"  🟢 LOW             : {severities['LOW']}",
+        ]
+
+        if failed_checks:
+            lines.append("\n  Principaux checks échoués :")
+            for c in failed_checks:
+                lines.append(
+                    f"    [{c['severity']}] {c['id']} — {c['name']} "
+                    f"(fichier: {c['file']}, ressource: {c['resource']})"
+                )
+
+        return "\n".join(lines)
+
+    except Exception as exc:
+        print(f"  [WARN] Lecture Checkov : {exc}", file=sys.stderr)
         return ""
 
 
@@ -82,10 +140,6 @@ def _extract_sonar_kpis(path: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_context() -> str:
-    """
-    Lit chaque rapport, applique un traitement spécifique si nécessaire
-    (ex. extraction KPIs Sonar) et renvoie le contexte global formaté.
-    """
     context_parts = []
 
     for label, filepath in REPORTS.items():
@@ -95,7 +149,7 @@ def build_context() -> str:
 
         print(f"  [OK]   Intégration : {label}")
 
-        # Traitement spécifique SonarCloud : extraction des KPIs
+        # Traitement spécifique SonarCloud
         if "sonar" in filepath.lower():
             sonar_text = _extract_sonar_kpis(filepath)
             if sonar_text:
@@ -103,7 +157,15 @@ def build_context() -> str:
                     f"\n\n=== RÉSULTATS {label.upper()} ===\n{sonar_text}\n"
                 )
                 continue
-            # Fallback : lecture brute si extraction échoue
+
+        # Traitement spécifique Checkov  ← NOUVEAU
+        if "checkov" in filepath.lower():
+            checkov_text = _extract_checkov_kpis(filepath)
+            if checkov_text:
+                context_parts.append(
+                    f"\n\n=== RÉSULTATS {label.upper()} ===\n{checkov_text}\n"
+                )
+                continue
 
         try:
             with open(filepath, encoding="utf-8") as fh:
@@ -118,11 +180,11 @@ def build_context() -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. PROMPT
+# 4. PROMPT — Section IaC ajoutée
 # ─────────────────────────────────────────────────────────────────────────────
 
 PROMPT_TEMPLATE = """
-Tu es un expert DevSecOps junior. Voici les rapports de sécurité complets générés par le
+Tu es un expert DevSecOps senior. Voici les rapports de sécurité complets générés par le
 pipeline CI/CD du projet WebGoat :
 
 {context}
@@ -131,7 +193,7 @@ pipeline CI/CD du projet WebGoat :
 MISSION
 ════════════════════════════════════════════════════════════════
 Rédige une synthèse globale en français, claire et structurée, en corrélant
-les résultats de tous les outils (SCA, SAST, DAST, Secrets, Runtime).
+les résultats de tous les outils (SCA, SAST, DAST, Secrets, Runtime, IaC).
 Utilise le format Markdown avec des titres de niveau ## pour chaque section.
 
 ════════════════════════════════════════════════════════════════
@@ -164,11 +226,18 @@ Présence ou absence de secrets en clair dans le code source.
 Commente les événements suspects capturés pendant l'exécution.
 [GRAPHIQUE_FALCO]
 
-## 7. Corrélations inter-outils
-Identifie les vulnérabilités ou risques qui apparaissent dans plusieurs outils à la fois
-(ex. une CVE Trivy exploitable via ZAP, ou un secret corrélé à un accès Falco suspect).
+## 7. Analyse IaC — Infrastructure (Checkov)
+Analyse les misconfigurations détectées dans les fichiers Dockerfile, docker-compose, IaC.
+Identifie les checks critiques et élevés échoués.
+Corrèle avec les vulnérabilités OWASP correspondantes (A05, A02, A04...).
+[GRAPHIQUE_IAC]
 
-## 8. Recommandations Prioritaires
+## 8. Corrélations inter-outils
+Identifie les vulnérabilités ou risques qui apparaissent dans plusieurs outils à la fois
+(ex. une CVE Trivy exploitable via ZAP, un secret corrélé à un accès Falco suspect,
+une misconfiguration IaC Checkov liée à une alerte Runtime Falco).
+
+## 9. Recommandations Prioritaires
 Liste numérotée des actions urgentes, classées par criticité décroissante.
 Pour chaque action : outil concerné, impact attendu, effort estimé (Faible/Moyen/Élevé).
 
@@ -189,10 +258,6 @@ RÈGLES DE FORMATAGE STRICTES
 # ─────────────────────────────────────────────────────────────────────────────
 
 def call_gemini(prompt: str) -> str | None:
-    """
-    Appelle Gemini avec retry sur erreurs 5xx / quotas.
-    Retourne le texte généré ou None si toutes les tentatives ont échoué.
-    """
     client = genai.Client()
 
     for attempt in range(1, MAX_RETRIES + 1):
@@ -214,7 +279,6 @@ def call_gemini(prompt: str) -> str | None:
                 print(f"  Pause {RETRY_DELAY}s avant nouvel essai…", file=sys.stderr)
                 time.sleep(RETRY_DELAY)
             elif not is_retryable:
-                # Erreur non-récupérable (clé invalide, quota définitif…)
                 print("  Erreur non-récupérable, abandon.", file=sys.stderr)
                 return None
 
@@ -230,7 +294,6 @@ def main() -> None:
     print("  Analyse IA corrélée — Pipeline DevSecOps WebGoat")
     print("═" * 60)
 
-    # ── Collecte du contexte ──────────────────────────────────────
     print("\n[1/3] Lecture des rapports disponibles…")
     context = build_context()
 
@@ -243,10 +306,9 @@ def main() -> None:
         _write_output(fallback)
         sys.exit(0)
 
-    # ── Appel Gemini ──────────────────────────────────────────────
     print("\n[2/3] Envoi à Gemini pour analyse…")
-    prompt  = PROMPT_TEMPLATE.format(context=context)
-    result  = call_gemini(prompt)
+    prompt = PROMPT_TEMPLATE.format(context=context)
+    result = call_gemini(prompt)
 
     if result is None:
         error_msg = (
@@ -258,7 +320,6 @@ def main() -> None:
         print(f"\n[FAIL] {error_msg}", file=sys.stderr)
         sys.exit(1)
 
-    # ── Sauvegarde ────────────────────────────────────────────────
     print("\n[3/3] Sauvegarde du rapport IA…")
     _write_output(result)
 

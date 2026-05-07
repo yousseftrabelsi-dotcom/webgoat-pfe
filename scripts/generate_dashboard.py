@@ -462,6 +462,44 @@ def fig_trend() -> go.Figure:
     return fig
 
 
+def fig_checkov(checkov: dict) -> go.Figure:
+    """Graphique IaC Checkov — checks échoués par sévérité + passés."""
+    labels = ["Critical", "High", "Medium", "Low"]
+    values = [checkov.get(k, 0) for k in labels]
+    colors = ["#ef4444", "#f97316", "#eab308", "#22c55e"]
+    passed = checkov.get("passed", 0)
+
+    if sum(values) == 0 and passed == 0:
+        fig = go.Figure()
+        fig.add_annotation(text="✓ Aucune donnée IaC", xref="paper", yref="paper",
+                           x=0.5, y=0.5, showarrow=False,
+                           font=dict(size=15, color="#22c55e", family=_FONT))
+    else:
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            name="Échoués",
+            x=labels, y=values,
+            marker=dict(color=colors, opacity=0.88,
+                        line=dict(color="rgba(0,0,0,0.3)", width=1)),
+            text=values, textposition="auto",
+            textfont=dict(color=_TEXT, size=13, family=_FONT),
+        ))
+        fig.add_trace(go.Bar(
+            name="Passés",
+            x=["Passés"], y=[passed],
+            marker=dict(color="#22c55e", opacity=0.7,
+                        line=dict(color="rgba(0,0,0,0.3)", width=1)),
+            text=[passed], textposition="auto",
+            textfont=dict(color=_TEXT, size=13, family=_FONT),
+        ))
+
+    fig.update_layout(**_BASE, title_text="Checks IaC (Checkov)",
+                      title_x=0.5, title_font=dict(size=13, color=_MUTED),
+                      xaxis=_axes(), yaxis=_axes(), barmode="group",
+                      legend=dict(font=dict(color=_TEXT, size=11), bgcolor="rgba(0,0,0,0)"))
+    return fig
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 6. CONVERSION MARKDOWN → HTML
 # ─────────────────────────────────────────────────────────────────────────────
@@ -597,11 +635,12 @@ def generate_dashboard():
     g_trend = f_trend.to_html(full_html=False, include_plotlyjs=False)
 
     # Copies dédiées au rapport IA (IDs Plotly distincts)
-    ai_sca   = f_sca.to_html(full_html=False, include_plotlyjs=False)
-    ai_sast  = f_sast.to_html(full_html=False, include_plotlyjs=False)
-    ai_dast  = f_dast.to_html(full_html=False, include_plotlyjs=False)
-    ai_falco = f_falco.to_html(full_html=False, include_plotlyjs=False)
-    ai_sec   = f_sec.to_html(full_html=False, include_plotlyjs=False)
+    ai_sca     = f_sca.to_html(full_html=False, include_plotlyjs=False)
+    ai_sast    = f_sast.to_html(full_html=False, include_plotlyjs=False)
+    ai_dast    = f_dast.to_html(full_html=False, include_plotlyjs=False)
+    ai_falco   = f_falco.to_html(full_html=False, include_plotlyjs=False)
+    ai_sec     = f_sec.to_html(full_html=False, include_plotlyjs=False)
+    ai_checkov = fig_checkov(checkov_data).to_html(full_html=False, include_plotlyjs=False)
 
     # ── Rapport IA : Markdown → HTML + graphiques ─────────────────
     ai_html = md_to_html(ai_raw)
@@ -611,6 +650,7 @@ def generate_dashboard():
         "GRAPHIQUE_DAST":    ai_dast,
         "GRAPHIQUE_SECRETS": ai_sec,
         "GRAPHIQUE_FALCO":   ai_falco,
+        "GRAPHIQUE_IAC":     ai_checkov,   # ← NOUVEAU
     })
     ai_html = force_inject_sast(ai_html, ai_sast)
 
@@ -796,10 +836,9 @@ def generate_dashboard():
     .ai-box {{
       background: linear-gradient(135deg, rgba(6,182,212,.04) 0%, rgba(99,102,241,.04) 100%);
       border: 1px solid rgba(6,182,212,.15);
-      border-radius: 12px; padding: 28px 36px;
+      border-radius: 12px; padding: 24px;
       font-family: 'Space Grotesk', sans-serif;
-      font-size: .95rem; color: var(--muted); line-height: 1.85;
-      max-width: 100%; width: 100%;
+      font-size: .75rem; color: var(--muted); line-height: 1.75;
     }}
     .ai-badge {{
       font-size: .7rem; background: rgba(6,182,212,.15); color: var(--accent);
@@ -954,6 +993,25 @@ def generate_dashboard():
     </div>
   </div>
 
+  <!-- ── RAPPORT IA ── -->
+  <div class="section-label">Synthèse Intelligence Artificielle</div>
+  <div class="card-dark mb-4">
+    <div class="card-title">
+      🤖 Rapport IA Corrélé
+      <span class="ai-badge">SCA · SAST · DAST · Runtime · Secrets</span>
+=======
+  <!-- ── AI SUMMARY ── -->
+  <div class="section-label">Synthèse Intelligence Artificielle</div>
+  <div class="card-dark mb-4">
+    <div class="card-title">🤖 Rapport IA Corrélé
+      <span style="font-size:.7rem;background:rgba(6,182,212,0.15);color:var(--accent);
+                   padding:2px 10px;border-radius:10px;margin-left:auto">
+        SCA · SAST · DAST · Runtime · Secrets
+      </span>
+    </div>
+    <div class="ai-box">{ai_html}</div>
+  </div>
+
   <!-- ── MATRICE OWASP TOP 10 ── -->
   <div class="section-label">Couverture OWASP Top 10</div>
   <div class="card-dark mb-4">
@@ -967,18 +1025,6 @@ def generate_dashboard():
       <span style="color:#334155">—</span> — catégorie non couverte par cet outil
     </div>
     {owasp_matrix}
-  </div>
-
-  <!-- ── RAPPORT IA ── -->
-  <div class="section-label">Synthèse Intelligence Artificielle</div>
-  <div class="card-dark mb-4" style="max-width:100%">
-    <div class="card-title">🤖 Rapport IA Corrélé
-      <span style="font-size:.7rem;background:rgba(6,182,212,0.15);color:var(--accent);
-                   padding:2px 10px;border-radius:10px;margin-left:auto">
-        SCA · SAST · DAST · Runtime · Secrets
-      </span>
-    </div>
-    <div class="ai-box">{ai_html}</div>
   </div>
 
   <footer>
