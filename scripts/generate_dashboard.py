@@ -57,41 +57,51 @@ def parse_sonar(path: str = "sonar-results.json") -> dict:
     return data
 
 
-def parse_zap(path: str = "report_html.html") -> dict:
-    demo = {"CORS": 11, "CSRF": 5, "Session": 1, "Auth": 1}
+def parse_zap(path: str = "report_json.json") -> dict:
     counts = {"High": 0, "Medium": 0, "Low": 0, "Informational": 0}
-    if not os.path.isfile(path):
-        print(f"[WARN] ZAP : fichier introuvable — valeurs démo utilisées.", file=sys.stderr)
-        return demo
 
-    # Tentative JSON
-    try:
-        with open(path, encoding="utf-8") as fh:
-            data = json.load(fh)
-        for site in data.get("site", []):
-            for alert in site.get("alerts", []):
-                risk = alert.get("riskdesc", "").split(" ")[0]
-                if risk in counts:
-                    counts[risk] += 1
-        return counts
-    except json.JSONDecodeError:
-        pass
-    except Exception as exc:
-        print(f"[ERROR] ZAP JSON : {exc}", file=sys.stderr)
+    # 1. Essai avec report_json.json (source principale)
+    for candidate in ("report_json.json", "report_html.html"):
+        if not os.path.isfile(candidate):
+            continue
+        try:
+            with open(candidate, encoding="utf-8") as fh:
+                data = json.load(fh)
+            found = False
+            for site in data.get("site", []):
+                for alert in site.get("alerts", []):
+                    # riskdesc peut être "Medium (2)" ou "Medium" → on prend le 1er mot
+                    risk = alert.get("riskdesc", "").split(" ")[0].capitalize()
+                    if risk in counts:
+                        counts[risk] += 1
+                        found = True
+            if found or candidate == "report_json.json":
+                print(f"[INFO] ZAP : {sum(counts.values())} alertes depuis {candidate}")
+                return counts
+        except json.JSONDecodeError:
+            continue
+        except Exception as exc:
+            print(f"[ERROR] ZAP ({candidate}) : {exc}", file=sys.stderr)
 
-    # Fallback : extraction HTML par regex
-    try:
-        with open(path, encoding="utf-8") as fh:
-            html = fh.read()
-        for risk in list(counts.keys()):
-            m = re.search(
-                rf'<td[^>]*>\s*{risk}\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>',
-                html, re.IGNORECASE,
-            )
-            if m:
-                counts[risk] = int(m.group(1))
-    except Exception as exc:
-        print(f"[ERROR] ZAP HTML : {exc}", file=sys.stderr)
+    # 2. Fallback HTML regex
+    html_path = "report_html.html"
+    if os.path.isfile(html_path):
+        try:
+            with open(html_path, encoding="utf-8") as fh:
+                html = fh.read()
+            for risk in list(counts.keys()):
+                m = re.search(
+                    rf'<td[^>]*>\s*{risk}\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>',
+                    html, re.IGNORECASE,
+                )
+                if m:
+                    counts[risk] = int(m.group(1))
+            print(f"[INFO] ZAP : fallback HTML regex utilisé")
+            return counts
+        except Exception as exc:
+            print(f"[ERROR] ZAP HTML fallback : {exc}", file=sys.stderr)
+
+    print("[WARN] ZAP : aucun rapport trouvé — compteurs à zéro.", file=sys.stderr)
     return counts
 
 
