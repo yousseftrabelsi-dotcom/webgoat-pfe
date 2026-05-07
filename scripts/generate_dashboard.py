@@ -1010,17 +1010,6 @@ def generate_dashboard():
     </div>
   </div>
 
-  <!-- ── SYNTHÈSE IA ── -->
-  <div class="section-label">Synthèse Intelligence Artificielle</div>
-  <div class="ai-wrapper mb-4">
-    <div class="card-dark">
-      <div class="card-title">🤖 Rapport IA Corrélé
-        <span class="ai-badge">SCA · SAST · DAST · Runtime · Secrets · IaC</span>
-      </div>
-      <div class="ai-box">{ai_html}</div>
-    </div>
-  </div>
-
   <!-- ── MATRICE OWASP TOP 10 ── -->
   <div class="section-label">Couverture OWASP Top 10</div>
   <div class="card-dark mb-4">
@@ -1036,7 +1025,18 @@ def generate_dashboard():
     {owasp_matrix}
   </div>
 
-  <footer>
+<!-- ── SYNTHÈSE IA ── -->
+  <div class="section-label">Synthèse Intelligence Artificielle</div>
+  <div class="ai-wrapper mb-4">
+    <div class="card-dark">
+      <div class="card-title">🤖 Rapport IA Corrélé
+        <span class="ai-badge">SCA · SAST · DAST · Runtime · Secrets · IaC</span>
+      </div>
+      <div class="ai-box">{ai_html}</div>
+    </div>
+  </div>
+
+    <footer>
     Généré automatiquement par GitHub Actions — Run #{meta['run']} —
     <a href="{meta['run_url']}" target="_blank">Voir le pipeline complet</a>
   </footer>
