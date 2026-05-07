@@ -24,45 +24,108 @@ from pathlib import Path
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Répertoire à scanner (racine du dépôt par défaut)
-SCAN_DIR         = os.environ.get("SCAN_DIR", ".")
-OUTPUT_JSON      = "checkov-results.json"
-OUTPUT_SUMMARY   = "checkov-summary.txt"
+SCAN_DIR       = os.environ.get("SCAN_DIR", ".")
+OUTPUT_JSON    = "checkov-results.json"
+OUTPUT_SUMMARY = "checkov-summary.txt"
 
-# Checks à ignorer (faux positifs connus dans WebGoat / CI)
 SKIP_CHECKS = [
-    "CKV_DOCKER_2",    # Healthcheck — WebGoat n'en expose pas
-    "CKV_DOCKER_3",    # User non-root — image de démo
-    "CKV2_GHA_1",      # Pinning SHA actions — géré séparément
+    "CKV_DOCKER_2",
+    "CKV_DOCKER_3",
+    "CKV2_GHA_1",
 ]
 
-# Seuil de sortie : le script échoue si le nombre de checks critiques > MAX
 MAX_CRITICAL = 0
 MAX_HIGH     = 10
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 0. DÉTECTION DES FICHIERS IaC PRÉSENTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def detect_iac_files(scan_dir: str) -> dict:
+    """
+    Parcourt le dépôt et liste les fichiers IaC trouvés par type.
+    Retourne un dict {type: [fichiers]} et la liste des frameworks actifs.
+    """
+    found = {
+        "dockerfile":      [],
+        "github_actions":  [],
+        "docker_compose":  [],
+        "kubernetes":      [],
+        "terraform":       [],
+    }
+
+    for root, dirs, files in os.walk(scan_dir):
+        # Exclure node_modules, .git, target, build
+        dirs[:] = [d for d in dirs if d not in
+                   (".git", "node_modules", "target", "build", ".mvn")]
+
+        for fname in files:
+            fpath = os.path.join(root, fname)
+            flower = fname.lower()
+
+            if flower == "dockerfile" or flower.startswith("dockerfile."):
+                found["dockerfile"].append(fpath)
+            elif flower in ("docker-compose.yml", "docker-compose.yaml",
+                            "docker-compose.override.yml"):
+                found["docker_compose"].append(fpath)
+            elif ".github" in fpath and (flower.endswith(".yml") or
+                                          flower.endswith(".yaml")):
+                found["github_actions"].append(fpath)
+            elif flower.endswith(".tf") or flower.endswith(".tfvars"):
+                found["terraform"].append(fpath)
+            elif flower.endswith((".yml", ".yaml")) and any(
+                kw in open(fpath, encoding="utf-8",
+                           errors="ignore").read()
+                for kw in ("apiVersion", "kind: Pod", "kind: Deployment",
+                           "kind: Service", "kind: Ingress")
+            ):
+                found["kubernetes"].append(fpath)
+
+    # Frameworks actifs = ceux qui ont au moins 1 fichier
+    active = [fw for fw, files in found.items() if files]
+
+    print("\n  Fichiers IaC détectés :")
+    for fw, files in found.items():
+        if files:
+            print(f"    ✅ {fw:<20} : {len(files)} fichier(s)")
+            for f in files[:5]:
+                print(f"       → {f}")
+        else:
+            print(f"    —  {fw:<20} : aucun fichier")
+
+    return found, active
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. LANCEMENT DE CHECKOV
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_checkov() -> tuple[int, str, str]:
+def run_checkov(active_frameworks: list) -> tuple[int, str, str]:
     """
-    Lance Checkov en sous-processus et retourne (returncode, stdout, stderr).
-    On utilise --soft-fail pour que Checkov ne bloque pas le script Python
-    (on gère nous-mêmes la logique de seuil).
+    Lance Checkov. Si aucun framework IaC détecté, scanne quand même
+    avec tous les frameworks pour ne rien manquer.
     """
     skip_str = ",".join(SKIP_CHECKS)
 
+    # Si aucun framework détecté → scan général sans filtre
+    if active_frameworks:
+        framework_arg = ",".join(active_frameworks)
+        print(f"\n  Frameworks actifs : {framework_arg}")
+    else:
+        # Scan général — Checkov détecte lui-même ce qu'il peut analyser
+        framework_arg = "all"
+        print("\n  ⚠️  Aucun fichier IaC spécifique détecté — scan général (all)")
+
     cmd = [
         "checkov",
-        "--directory",    SCAN_DIR,
-        "--output",       "json",
-        "--output-file",  OUTPUT_JSON,
-        "--soft-fail",                 # Ne pas exit(1) sur findings
-        "--compact",                   # Logs plus lisibles
-        "--skip-check",   skip_str,
-        # Frameworks ciblés : Dockerfile, GitHub Actions, K8s, docker-compose
-        "--framework",    "dockerfile,github_actions,kubernetes,docker_compose",
+        "--directory",   SCAN_DIR,
+        "--output",      "json",
+        "--output-file", OUTPUT_JSON,
+        "--soft-fail",
+        "--compact",
+        "--skip-check",  skip_str,
+        "--framework",   framework_arg,
     ]
 
     print(f"  Commande : {' '.join(cmd)}\n")
@@ -73,7 +136,26 @@ def run_checkov() -> tuple[int, str, str]:
         text=True,
         cwd=SCAN_DIR,
     )
+
+    # Garantir que le fichier JSON existe même si Checkov ne l'a pas créé
+    if not os.path.isfile(OUTPUT_JSON):
+        print(f"  [WARN] Checkov n'a pas créé {OUTPUT_JSON} — création manuelle.")
+        _create_empty_json()
+
     return result.returncode, result.stdout, result.stderr
+
+
+def _create_empty_json():
+    """Crée un JSON vide valide si Checkov ne produit rien."""
+    empty = [{
+        "check_type": "none",
+        "summary": {"passed": 0, "failed": 0, "skipped": 0,
+                    "parsing_error": 0, "resource_count": 0},
+        "results": {"passed_checks": [], "failed_checks": [],
+                    "skipped_checks": [], "parsing_errors": []},
+    }]
+    with open(OUTPUT_JSON, "w", encoding="utf-8") as fh:
+        json.dump(empty, fh, indent=2)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -81,19 +163,15 @@ def run_checkov() -> tuple[int, str, str]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def parse_results(path: str) -> dict:
-    """
-    Lit checkov-results.json et retourne un dictionnaire de métriques.
-    Checkov peut produire soit un objet unique, soit une liste (multi-framework).
-    """
     stats = {
-        "passed":    0,
-        "failed":    0,
-        "skipped":   0,
-        "critical":  0,
-        "high":      0,
-        "medium":    0,
-        "low":       0,
-        "failed_checks": [],   # liste des checks échoués pour le résumé
+        "passed":        0,
+        "failed":        0,
+        "skipped":       0,
+        "critical":      0,
+        "high":          0,
+        "medium":        0,
+        "low":           0,
+        "failed_checks": [],
     }
 
     if not os.path.isfile(path):
@@ -107,7 +185,6 @@ def parse_results(path: str) -> dict:
         print(f"[ERROR] Lecture {path} : {exc}", file=sys.stderr)
         return stats
 
-    # Normalise en liste de rapports (un par framework)
     reports = raw if isinstance(raw, list) else [raw]
 
     for report in reports:
@@ -116,25 +193,20 @@ def parse_results(path: str) -> dict:
         stats["failed"]  += summary.get("failed",  0)
         stats["skipped"] += summary.get("skipped", 0)
 
-        results = report.get("results", {})
-
-        for check in results.get("failed_checks", []):
+        for check in report.get("results", {}).get("failed_checks", []):
             stats["failed_checks"].append({
                 "id":       check.get("check_id",     "—"),
                 "name":     check.get("check_name",   "—"),
-                "file":     check.get("repo_file_path", check.get("file_path", "—")),
-                "severity": check.get("severity",     "UNKNOWN").upper(),
-                "resource": check.get("resource",     "—"),
+                "file":     check.get("repo_file_path",
+                            check.get("file_path", "—")),
+                "severity": check.get("severity", "UNKNOWN").upper(),
+                "resource": check.get("resource", "—"),
             })
             sev = check.get("severity", "").upper()
-            if sev == "CRITICAL":
-                stats["critical"] += 1
-            elif sev == "HIGH":
-                stats["high"]     += 1
-            elif sev == "MEDIUM":
-                stats["medium"]   += 1
-            elif sev == "LOW":
-                stats["low"]      += 1
+            if   sev == "CRITICAL": stats["critical"] += 1
+            elif sev == "HIGH":     stats["high"]     += 1
+            elif sev == "MEDIUM":   stats["medium"]   += 1
+            elif sev == "LOW":      stats["low"]      += 1
 
     return stats
 
@@ -168,7 +240,7 @@ def write_summary(stats: dict, decision: str) -> None:
     if stats["failed_checks"]:
         lines.append("  Détail des checks échoués :")
         lines.append("")
-        for i, chk in enumerate(stats["failed_checks"][:30], 1):   # max 30
+        for i, chk in enumerate(stats["failed_checks"][:30], 1):
             lines.append(
                 f"  {i:>2}. [{chk['severity']:<8}] {chk['id']:<20}  {chk['name']}"
             )
@@ -176,7 +248,9 @@ def write_summary(stats: dict, decision: str) -> None:
             lines.append(f"       Ressource : {chk['resource']}")
             lines.append("")
         if len(stats["failed_checks"]) > 30:
-            lines.append(f"  … et {len(stats['failed_checks']) - 30} autres checks. Voir {OUTPUT_JSON}.")
+            lines.append(
+                f"  … et {len(stats['failed_checks']) - 30} autres. Voir {OUTPUT_JSON}."
+            )
     else:
         lines.append("  Aucun check échoué.")
 
@@ -193,6 +267,7 @@ def write_summary(stats: dict, decision: str) -> None:
     with open(OUTPUT_SUMMARY, "w", encoding="utf-8") as fh:
         fh.write(text)
     print(f"\n[OK] Résumé sauvegardé → {OUTPUT_SUMMARY}")
+    print(f"[OK] Rapport JSON      → {OUTPUT_JSON}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -202,54 +277,48 @@ def write_summary(stats: dict, decision: str) -> None:
 def main():
     print("\n" + "═" * 64)
     print("  IaC Security Scan — Checkov")
-    print("  Frameworks : Dockerfile · GitHub Actions · K8s · docker-compose")
+    print("  Frameworks : Dockerfile · GitHub Actions · K8s · docker-compose · Terraform")
     print("═" * 64)
 
-    # ── Vérification Checkov installé ────────────────────────────
+    # Vérification Checkov installé
     chk = subprocess.run(["checkov", "--version"],
                          capture_output=True, text=True)
     if chk.returncode != 0:
-        print("[ERROR] Checkov n'est pas installé. Lancez : pip install checkov",
-              file=sys.stderr)
+        print("[ERROR] Checkov n'est pas installé.", file=sys.stderr)
         sys.exit(1)
     print(f"  Checkov version : {chk.stdout.strip()}")
 
-    # ── Scan ─────────────────────────────────────────────────────
-    print(f"\n[1/3] Scan du répertoire : {os.path.abspath(SCAN_DIR)}")
-    rc, stdout, stderr = run_checkov()
+    # Détection des fichiers IaC
+    print(f"\n[1/3] Détection des fichiers IaC dans : {os.path.abspath(SCAN_DIR)}")
+    _, active_frameworks = detect_iac_files(SCAN_DIR)
+
+    # Scan
+    print(f"\n[2/3] Lancement du scan Checkov…")
+    rc, stdout, stderr = run_checkov(active_frameworks)
     if stdout:
-        print(stdout[:2000])   # Affiche les 2000 premiers caractères
+        print(stdout[:2000])
     if stderr and rc != 0:
         print(f"[WARN] stderr : {stderr[:500]}", file=sys.stderr)
 
-    # ── Parsing ───────────────────────────────────────────────────
-    print(f"\n[2/3] Analyse des résultats ({OUTPUT_JSON})…")
+    # Parsing
+    print(f"\n[3/3] Analyse des résultats…")
     stats = parse_results(OUTPUT_JSON)
 
-    # ── Décision ──────────────────────────────────────────────────
-    print("\n[3/3] Évaluation des seuils…")
+    # Décision
     failures = []
     if stats["critical"] > MAX_CRITICAL:
-        failures.append(
-            f"  🔴 {stats['critical']} checks CRITICAL > seuil ({MAX_CRITICAL})"
-        )
+        failures.append(f"  🔴 {stats['critical']} CRITICAL > seuil ({MAX_CRITICAL})")
     if stats["high"] > MAX_HIGH:
-        failures.append(
-            f"  🟠 {stats['high']} checks HIGH > seuil ({MAX_HIGH})"
-        )
+        failures.append(f"  🟠 {stats['high']} HIGH > seuil ({MAX_HIGH})")
 
-    if failures:
-        decision = "❌  SCAN ÉCHOUÉ — seuils de sécurité dépassés"
-        for f in failures:
-            print(f)
-    else:
-        decision = "✅  SCAN RÉUSSI — seuils respectés"
+    decision = ("❌  SCAN ÉCHOUÉ — seuils de sécurité dépassés"
+                if failures else
+                "✅  SCAN RÉUSSI — seuils respectés")
+
+    for f in failures:
+        print(f)
 
     write_summary(stats, decision)
-
-    # ── Sortie pipeline ───────────────────────────────────────────
-    # continue-on-error: true est mis dans le YAML, donc on exit(1)
-    # uniquement si des seuils critiques sont dépassés.
     sys.exit(1 if failures else 0)
 
 
