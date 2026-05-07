@@ -3,7 +3,7 @@ scripts/ai_analyzer.py
 ──────────────────────────────────────────────────────────────────────────────
 Analyse IA corrélée — Pipeline DevSecOps WebGoat
 Agrège les rapports SCA · SAST · DAST · Secrets · Runtime et génère
-une synthèse Markdown enrichie via Gemini 2.5 Flash.
+une synthèse Markdown enrichie via Gemini-2.5-Flash.
 ──────────────────────────────────────────────────────────────────────────────
 """
 
