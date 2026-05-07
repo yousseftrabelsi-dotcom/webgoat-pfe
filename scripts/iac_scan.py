@@ -119,17 +119,17 @@ def run_checkov(active_frameworks: list) -> tuple[int, str, str]:
 
     cmd = [
         "checkov",
-        "--directory",   SCAN_DIR,
-        "--output",      "json",
-        "--output-file", OUTPUT_JSON,
+        "--directory",  SCAN_DIR,
+        "--output",     "json",
         "--soft-fail",
         "--compact",
-        "--skip-check",  skip_str,
-        "--framework",   framework_arg,
+        "--skip-check", skip_str,
+        "--framework",  framework_arg,
     ]
 
     print(f"  Commande : {' '.join(cmd)}\n")
 
+    # Capture stdout (= JSON) et stderr séparément
     result = subprocess.run(
         cmd,
         capture_output=True,
@@ -137,9 +137,28 @@ def run_checkov(active_frameworks: list) -> tuple[int, str, str]:
         cwd=SCAN_DIR,
     )
 
-    # Garantir que le fichier JSON existe même si Checkov ne l'a pas créé
-    if not os.path.isfile(OUTPUT_JSON):
-        print(f"  [WARN] Checkov n'a pas créé {OUTPUT_JSON} — création manuelle.")
+    # Écriture manuelle du JSON depuis stdout
+    json_output = result.stdout.strip()
+    if json_output:
+        # Checkov peut préfixer la sortie avec des logs — on extrait le JSON
+        # en cherchant le premier [ ou {
+        import re
+        m = re.search(r'(\[|\{)', json_output)
+        if m:
+            json_part = json_output[m.start():]
+            try:
+                parsed = json.loads(json_part)
+                with open(OUTPUT_JSON, "w", encoding="utf-8") as fh:
+                    json.dump(parsed, fh, indent=2)
+                print(f"  [OK] JSON écrit depuis stdout → {OUTPUT_JSON}")
+            except json.JSONDecodeError:
+                print(f"  [WARN] JSON stdout invalide — création manuelle.")
+                _create_empty_json()
+        else:
+            print(f"  [WARN] Stdout vide ou non-JSON — création manuelle.")
+            _create_empty_json()
+    else:
+        print(f"  [WARN] Checkov stdout vide — création manuelle.")
         _create_empty_json()
 
     return result.returncode, result.stdout, result.stderr

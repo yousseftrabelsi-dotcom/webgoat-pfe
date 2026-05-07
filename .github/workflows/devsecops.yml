@@ -260,8 +260,20 @@ jobs:
       - name: Download all scan reports
         uses: actions/download-artifact@v4
         with:
+          path: artifacts/
           merge-multiple: true
         continue-on-error: true
+
+      - name: Flatten artifacts to working directory
+        run: |
+          find artifacts/ -type f | while read f; do
+            # Si la destination est un dossier (artifact mal aplati), on le supprime
+            dest=$(basename "$f")
+            [ -d "$dest" ] && rm -rf "$dest"
+            cp "$f" . && echo "Copié : $f → $dest"
+          done
+          echo "=== Fichiers disponibles ==="
+          ls -lah *.json *.sarif *.html *.txt 2>/dev/null || true
 
       - name: List available reports
         run: ls -lah *.json *.sarif *.html 2>/dev/null || echo "Certains rapports sont manquants."
@@ -366,6 +378,7 @@ jobs:
 
       - name: Run Quality Gate
         id: gate
+        # continue-on-error: true → la notification Slack s'envoie même si le gate échoue
         continue-on-error: true
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
@@ -377,6 +390,14 @@ jobs:
         with:
           name: report-quality-gate
           path: quality-gate-report.txt
+
+      # Bloque le pipeline si le gate a échoué (exit code 1)
+      - name: Fail if gate rejected
+        if: steps.gate.outcome == 'failure'
+        run: |
+          echo "::error::Quality Gate ÉCHOUÉ — déploiement bloqué."
+          echo "::error::Consultez l'artefact report-quality-gate pour les détails."
+          exit 1
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PHASE 5 — NOTIFICATION SLACK (toujours exécutée, même si le gate échoue)
