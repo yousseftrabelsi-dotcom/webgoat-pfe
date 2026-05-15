@@ -330,6 +330,22 @@ jobs:
           GITHUB_REF_NAME:   ${{ github.ref_name }}
           GITHUB_ACTOR:      ${{ github.actor }}
         run: python scripts/generate_dashboard.py
+      - name: Generate Dashboard
+        env:
+          GITHUB_SHA:        ${{ github.sha }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_RUN_URL:    ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_REF_NAME:   ${{ github.ref_name }}
+          GITHUB_ACTOR:      ${{ github.actor }}
+        run: python scripts/generate_dashboard.py
+
+      # 🟢 AJOUTEZ CE BLOC ICI 🟢
+      - name: 📤 Sauvegarder le Dashboard (Temporaire)
+        uses: actions/upload-artifact@v4
+        with:
+          name: temp-dashboard
+          path: global_security_report.html
+          retention-days: 1
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PHASE 4 — QUALITY GATE (bloque le déploiement si seuils dépassés)
