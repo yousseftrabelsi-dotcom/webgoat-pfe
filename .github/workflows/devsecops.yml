@@ -1,12 +1,3 @@
-# ══════════════════════════════════════════════════════════════════════════════
-# DevSecOps WebGoat Pipeline
-# ──────────────────────────────────────────────────────────────────────────────
-# PHASE 1 │ Scans statiques   : Gitleaks · SonarCloud · Trivy · Checkov (IaC)
-# PHASE 2 │ Scans dynamiques  : OWASP ZAP · Falco
-# PHASE 3 │ IA + Dashboard    : Gemini · Plotly (+ Matrice OWASP)
-# PHASE 4 │ Quality Gate      : bloque le pipeline si seuils dépassés
-# PHASE 5 │ Notification      : résumé Slack après chaque run
-# ══════════════════════════════════════════════════════════════════════════════
 name: DevSecOps WebGoat Pipeline
 
 on:
