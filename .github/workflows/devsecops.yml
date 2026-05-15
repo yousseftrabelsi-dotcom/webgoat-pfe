@@ -390,7 +390,7 @@ jobs:
         with:
           name: DevSecOps-Final-Reports
           path: |
-            global_security_report.html
+            global-security-report.html
             quality-gate-report.html
             quality_gate_report.txt
       # Avertissement informatif — le job reste vert même si le gate bloque
