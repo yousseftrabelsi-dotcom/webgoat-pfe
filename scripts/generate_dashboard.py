@@ -898,7 +898,10 @@ def generate_dashboard():
 
 <!-- ── HEADER ── -->
 <div class="dash-header">
-  <h1>🛡️ DevSecOps <span>Executive</span> Dashboard</h1>
+  <div class="header-eyebrow">
+    <span class="live-dot"></span>DevSecOps Pipeline &nbsp;·&nbsp; Live Threat Report
+  </div>
+  <h1>🛡️ DevSecOps <span>Executive</span> Dashboard<span class="cursor-blink"></span></h1>
   <p>Pipeline CI/CD — Projet WebGoat</p>
   <div class="meta-row">
     <span class="meta-pill">🔀 {meta['branch']}</span>
