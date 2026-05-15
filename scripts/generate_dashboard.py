@@ -955,6 +955,7 @@ def generate_dashboard():
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
+      width: 100%;
     }}
     .action-card {{
       display: flex; align-items: center;
@@ -965,6 +966,7 @@ def generate_dashboard():
       text-decoration: none; color: var(--text);
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       overflow: hidden;
+      min-width: 0;
     }}
     .action-card:hover {{ transform: translateY(-3px); border-color: rgba(56,189,248,.3); }}
     .action-icon {{
