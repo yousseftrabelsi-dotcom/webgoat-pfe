@@ -950,6 +950,7 @@ def generate_dashboard():
       background: rgba(249,115,22,0.10);
       border-color: var(--warn);
     }}
+    </style>
 
 <!-- ── THEME TOGGLE ── -->
 <div id="theme-toggle">
