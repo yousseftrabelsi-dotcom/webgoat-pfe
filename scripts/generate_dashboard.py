@@ -1056,6 +1056,7 @@ def generate_dashboard():
       <div class="kpi-val" style="color:{'#ef4444' if checkov_data.get('Critical',0)+checkov_data.get('High',0)>0 else '#22c55e'}">{checkov_data.get('Critical',0)+checkov_data.get('High',0)}</div>
       <div class="kpi-lbl">🏗️ Issues IaC (Checkov)</div>
     </div>
+  </div>
   <!-- ── ACTIONS RAPIDES ── -->
   <div class="section-label">Actions rapides</div>
   <div class="action-grid mb-4">
