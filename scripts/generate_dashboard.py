@@ -1106,7 +1106,7 @@ def generate_dashboard():
         <div class="action-arrow">➜</div>
       </a>
 
-      <a href="quality_gate_report.html" target="_blank" class="action-card card-gate">
+      <a href="quality-gate-report.html" target="_blank" class="action-card card-gate">
         <div class="action-icon">⚖️</div>
         <div class="action-content">
           <span class="action-title">Décision Quality Gate</span>
