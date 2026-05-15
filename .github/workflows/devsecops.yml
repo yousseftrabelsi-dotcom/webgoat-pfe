@@ -384,16 +384,16 @@ jobs:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
         run: python scripts/quality_gate.py
 
-      - name: 📦 Regrouper et Sauvegarder les rapports finaux
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: DevSecOps-Final-Reports
-          path: |
-            global_security_report.html
+      - name: Upload Quality Gate Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-quality-gate
+          path: |
             quality-gate-report.html
             quality-gate-report.txt
-      
+
+      # Avertissement informatif — le job reste vert même si le gate bloque
       - name: Quality Gate Status
         if: always()
         run: |
@@ -402,6 +402,15 @@ jobs:
           else
             echo "::notice::✅ Quality Gate — Déploiement AUTORISÉ."
           fi
+          - name: 📦 Regrouper et Sauvegarder les rapports finaux
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DevSecOps-Final-Reports
+          path: |
+            global_security_report.html
+            quality-gate-report.html
+            quality-gate-report.txt
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PHASE 5 — NOTIFICATION SLACK (toujours exécutée, même si le gate échoue)
