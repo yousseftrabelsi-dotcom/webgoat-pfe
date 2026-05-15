@@ -950,80 +950,43 @@ def generate_dashboard():
       background: rgba(249,115,22,0.10);
       border-color: var(--warn);
     }}
-    /* ── CARTES D'ACTION ESTHÉTIQUES ── */
+    //* ── CARTES D'ACTION ── */
     .action-grid {{
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-template-columns: 1fr 1fr;
       gap: 20px;
-      margin: 20px 0 40px 0;
     }}
-
     .action-card {{
-      display: flex;
-      align-items: center;
-      padding: 20px;
+      display: flex; align-items: center;
+      padding: 22px 28px; gap: 20px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      text-decoration: none;
-      color: var(--text);
+      border-radius: 14px;
+      text-decoration: none; color: var(--text);
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      position: relative;
       overflow: hidden;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }}
-
-    .action-card:hover {{
-      transform: translateY(-5px);
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
-      border-color: var(--accent);
-    }}
-
+    .action-card:hover {{ transform: translateY(-3px); border-color: rgba(56,189,248,.3); }}
     .action-icon {{
-      width: 48px;
-      height: 48px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.5rem;
-      margin-right: 16px;
-      flex-shrink: 0;
+      width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 1.6rem;
     }}
-
-    .action-content {{
-      flex-grow: 1;
+    .action-content {{ flex: 1; }}
+    .action-title {{ font-weight: 600; font-size: .97rem; display: block; margin-bottom: 5px; }}
+    .action-desc  {{ font-size: .78rem; color: var(--muted); line-height: 1.5; }}
+    .action-badge {{
+      font-family: 'JetBrains Mono', monospace; font-size: .65rem; letter-spacing: .07em;
+      padding: 2px 8px; border-radius: 6px; margin-top: 8px; display: inline-block;
     }}
-
-    .action-title {{
-      font-weight: 700;
-      font-size: 1rem;
-      margin-bottom: 4px;
-      display: block;
-    }}
-
-    .action-desc {{
-      font-size: 0.85rem;
-      opacity: 0.7;
-    }}
-
-    .card-slack {{ border-left: 5px solid #4A154B; }}
-    .card-slack .action-icon {{ background: rgba(74, 21, 75, 0.1); color: #4A154B; }}
-
-    .card-gate {{ border-left: 5px solid #2563eb; }}
-    .card-gate .action-icon {{ background: rgba(37, 99, 235, 0.1); color: #2563eb; }}
-
     .action-arrow {{
-      margin-left: 10px;
-      opacity: 0;
-      transition: transform 0.3s ease, opacity 0.3s ease;
-      transform: translateX(-10px);
+      font-size: 1.1rem; color: var(--accent); opacity: 0; flex-shrink: 0;
+      transition: opacity .3s ease, transform .3s ease; transform: translateX(-8px);
     }}
-
-    .action-card:hover .action-arrow {{
-      opacity: 1;
-      transform: translateX(0);
-    }}    
+    .action-card:hover .action-arrow {{ opacity: 1; transform: translateX(0); }}
+    .card-slack {{ border-left: 3px solid rgba(74,21,75,.8); }}
+    .card-slack .action-icon {{ background: rgba(74,21,75,.2); border: 1px solid rgba(74,21,75,.4); }}
+    .card-gate  {{ border-left: 3px solid rgba(37,99,235,.8); }}
+    .card-gate  .action-icon {{ background: rgba(37,99,235,.15); border: 1px solid rgba(37,99,235,.4); }} 
     </style>
 
 <!-- ── THEME TOGGLE ── -->
@@ -1093,27 +1056,30 @@ def generate_dashboard():
       <div class="kpi-val" style="color:{'#ef4444' if checkov_data.get('Critical',0)+checkov_data.get('High',0)>0 else '#22c55e'}">{checkov_data.get('Critical',0)+checkov_data.get('High',0)}</div>
       <div class="kpi-lbl">🏗️ Issues IaC (Checkov)</div>
     </div>
-  <div class="action-grid">
-    
-      <a href="https://app.slack.com/client/T0B0X732287/C0B1AJXL338" target="_blank" class="action-card card-slack">
-        <div class="action-icon">💬</div>
-        <div class="action-content">
-          <span class="action-title">Canal de Notification Slack</span>
-          <span class="action-desc">Consulter l'historique des alertes et les détails envoyés par le Bot.</span>
-        </div>
-        <div class="action-arrow">➜</div>
-      </a>
+  <!-- ── ACTIONS RAPIDES ── -->
+  <div class="section-label">Actions rapides</div>
+  <div class="action-grid mb-4">
 
-      <a href="quality-gate-report.html" target="_blank" class="action-card card-gate">
-        <div class="action-icon">⚖️</div>
-        <div class="action-content">
-          <span class="action-title">Décision Quality Gate</span>
-          <span class="action-desc">Analyse détaillée des seuils de sécurité et score final de déploiement.</span>
-        </div>
-        <div class="action-arrow">➜</div>
-      </a>
+    <a href="https://app.slack.com/..." target="_blank" class="action-card card-slack">
+      <div class="action-icon">💬</div>
+      <div class="action-content">
+        <span class="action-title">Canal de Notification Slack</span>
+        <span class="action-desc">Consulter l'historique des alertes et les détails envoyés par le Bot.</span>
+        <span class="action-badge" style="background:rgba(74,21,75,.25);color:#c084fc;border:1px solid rgba(192,132,252,.25)">#devsecops-alerts</span>
+      </div>
+      <div class="action-arrow">→</div>
+    </a>
 
-    </div>
+    <a href="quality-gate-report.html" target="_blank" class="action-card card-gate">
+      <div class="action-icon">⚖️</div>
+      <div class="action-content">
+        <span class="action-title">Décision Quality Gate</span>
+        <span class="action-desc">Analyse détaillée des seuils de sécurité et score final de déploiement.</span>
+        <span class="action-badge" style="background:rgba(37,99,235,.18);color:#93c5fd;border:1px solid rgba(147,197,253,.25)">quality-gate-report.html</span>
+      </div>
+      <div class="action-arrow">→</div>
+    </a>
+
   </div>
 
   <!-- ── GRAPHIQUES DE SÉCURITÉ ── -->
