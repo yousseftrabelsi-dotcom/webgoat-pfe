@@ -879,16 +879,77 @@ def generate_dashboard():
     }}
     [data-theme="light"] .note {{ background: rgba(0,0,0,.03); }}
 
-    /* ── FOOTER ── */
+        /* ── FOOTER ── */
     footer {{
       text-align: center; padding: 28px 0 20px;
       font-family: 'JetBrains Mono', monospace; font-size: .72rem;
       color: var(--muted); border-top: 1px solid var(--border); margin-top: 40px;
     }}
     footer a {{ color: var(--accent); text-decoration: none; }}
-  </style>
-</head>
-<body>
+ 
+    /* ── LIVE DOT ── */
+    .live-dot {{
+      display: inline-block; width: 7px; height: 7px;
+      border-radius: 50%; background: var(--ok);
+      margin-right: 6px; vertical-align: middle;
+      animation: livePulse 2s ease-in-out infinite;
+    }}
+    @keyframes livePulse {{
+      0%, 100% {{ box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }}
+      50%       {{ box-shadow: 0 0 0 6px rgba(34,197,94,0); }}
+    }}
+ 
+    /* ── CURSOR BLINK ── */
+    .cursor-blink {{
+      display: inline-block; width: 2px; height: 1em;
+      background: var(--accent); margin-left: 3px;
+      vertical-align: middle;
+      animation: cursorBlink .9s step-end infinite;
+    }}
+    @keyframes cursorBlink {{
+      0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0; }}
+    }}
+ 
+    /* ── HEADER EYEBROW ── */
+    .header-eyebrow {{
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .65rem; letter-spacing: .2em;
+      color: var(--accent); text-transform: uppercase;
+      margin-bottom: 8px;
+      display: flex; align-items: center; gap: 6px;
+    }}
+ 
+    /* ── RISK STATUS BADGE (remplace .badge Bootstrap) ── */
+    .risk-status-pill {{
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 14px; border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .75rem; font-weight: 700;
+      letter-spacing: .08em; text-transform: uppercase;
+      border: 1px solid currentColor;
+      margin-bottom: 6px;
+    }}
+    .risk-status-pill.blocking {{
+      color: var(--danger);
+      background: rgba(239,68,68,0.12);
+      border-color: var(--danger);
+      box-shadow: 0 0 12px rgba(239,68,68,0.2);
+      animation: dangerPulse 2s ease-in-out infinite;
+    }}
+    @keyframes dangerPulse {{
+      0%, 100% {{ box-shadow: 0 0 8px rgba(239,68,68,0.2); }}
+      50%       {{ box-shadow: 0 0 18px rgba(239,68,68,0.45); }}
+    }}
+    .risk-status-pill.ok {{
+      color: var(--ok);
+      background: rgba(34,197,94,0.10);
+      border-color: var(--ok);
+    }}
+    .risk-status-pill.high {{
+      color: var(--warn);
+      background: rgba(249,115,22,0.10);
+      border-color: var(--warn);
+    }}
 
 <!-- ── THEME TOGGLE ── -->
 <div id="theme-toggle">

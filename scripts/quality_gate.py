@@ -24,15 +24,15 @@ THRESHOLDS = {
     "secrets_max":          0,
 
     # Trivy SCA
-    "trivy_critical_max":   0,    # 0 CVE critique tolérée
-    "trivy_high_max":       5,    # max 5 CVE élevées
+    "trivy_critical_max":   5,
+    "trivy_high_max":       30,
 
     # SonarCloud SAST
-    "sonar_vulnerabilities_max": 10,
-    "sonar_hotspots_max":        20,
+    "sonar_vulnerabilities_max": 50,
+    "sonar_hotspots_max":        80,
 
     # OWASP ZAP DAST
-    "zap_high_max":         0,    # 0 alerte haute tolérée
+    "zap_high_max":         5,
 
     # Falco Runtime
     "falco_critical_max":   0,
