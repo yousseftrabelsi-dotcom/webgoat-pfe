@@ -342,7 +342,7 @@ jobs:
 # PHASE 4 — QUALITY GATE (bloque le déploiement si seuils dépassés)
 # ══════════════════════════════════════════════════════════════════════════════
 
-quality-gate:
+  quality-gate:
     name: "🚦 Quality Gate"
     needs: generate-dashboard
     if: always()
