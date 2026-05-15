@@ -352,7 +352,7 @@ jobs:
 # PHASE 4 — QUALITY GATE (bloque le déploiement si seuils dépassés)
 # ══════════════════════════════════════════════════════════════════════════════
 
-  quality-gate:
+quality-gate:
     name: "🚦 Quality Gate"
     needs: generate-dashboard
     if: always()
@@ -366,10 +366,9 @@ jobs:
           path: artifacts/
           merge-multiple: true
 
-      - name: Flatten artifacts to working directory
+      - name: Flatten artifacts
         run: |
           find artifacts/ -type f | while read f; do cp "$f" .; done
-          ls -lah *.json *.sarif *.txt 2>/dev/null || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -378,30 +377,18 @@ jobs:
 
       - name: Run Quality Gate
         id: gate
-        # continue-on-error: true → la notification Slack s'envoie même si le gate échoue
-        continue-on-error: true
-        env:
-          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        continue-on-error: true # Pour permettre la suite (notifs)
         run: python scripts/quality_gate.py
 
-      - name: Upload Quality Gate Report
+      # C'EST ICI QU'IL FAUT PLACER LA COMMANDE CORRECTEMENT INDENTÉE
+      - name: 💾 Sauvegarder les rapports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: report-quality-gate
+          name: security-dashboard
           path: |
-            quality-gate-report.html
-            quality-gate-report.txt
-
-      # Avertissement informatif — le job reste vert même si le gate bloque
-      - name: Quality Gate Status
-        if: always()
-        run: |
-          if [ "${{ steps.gate.outcome }}" == "failure" ]; then
-            echo "::warning::🚫 Quality Gate — Déploiement BLOQUÉ. Consultez report-quality-gate pour les détails."
-          else
-            echo "::notice::✅ Quality Gate — Déploiement AUTORISÉ."
-          fi
+            global_security_report.html
+            quality_gate_report.html
 # ══════════════════════════════════════════════════════════════════════════════
 # PHASE 5 — NOTIFICATION SLACK (toujours exécutée, même si le gate échoue)
 # ══════════════════════════════════════════════════════════════════════════════
