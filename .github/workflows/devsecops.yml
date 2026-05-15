@@ -366,9 +366,10 @@ quality-gate:
           path: artifacts/
           merge-multiple: true
 
-      - name: Flatten artifacts
+      - name: Flatten artifacts to working directory
         run: |
           find artifacts/ -type f | while read f; do cp "$f" .; done
+          ls -lah *.json *.sarif *.txt 2>/dev/null || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -377,18 +378,31 @@ quality-gate:
 
       - name: Run Quality Gate
         id: gate
-        continue-on-error: true # Pour permettre la suite (notifs)
+        continue-on-error: true
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
         run: python scripts/quality_gate.py
 
-      # C'EST ICI QU'IL FAUT PLACER LA COMMANDE CORRECTEMENT INDENTÉE
-      - name: 💾 Sauvegarder les rapports
+      # --- C'EST CETTE ÉTAPE QUI CHANGE ---
+      - name: 📦 Regrouper et Sauvegarder les rapports finaux
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: security-dashboard
+          name: DevSecOps-Final-Reports
           path: |
             global_security_report.html
             quality_gate_report.html
+            quality_gate_report.txt
+
+      # Avertissement informatif — le job reste vert même si le gate bloque
+      - name: Quality Gate Status
+        if: always()
+        run: |
+          if [ "${{ steps.gate.outcome }}" == "failure" ]; then
+            echo "::warning::🚫 Quality Gate — Déploiement BLOQUÉ. Consultez report-quality-gate pour les détails."
+          else
+            echo "::notice::✅ Quality Gate — Déploiement AUTORISÉ."
+          fi
 # ══════════════════════════════════════════════════════════════════════════════
 # PHASE 5 — NOTIFICATION SLACK (toujours exécutée, même si le gate échoue)
 # ══════════════════════════════════════════════════════════════════════════════
