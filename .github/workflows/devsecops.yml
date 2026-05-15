@@ -402,16 +402,6 @@ jobs:
           else
             echo "::notice::✅ Quality Gate — Déploiement AUTORISÉ."
           fi
-          - name: 📦 Regrouper et Sauvegarder les rapports finaux
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: DevSecOps-Final-Reports
-          path: |
-            global_security_report.html
-            quality-gate-report.html
-            quality-gate-report.txt
-
 # ══════════════════════════════════════════════════════════════════════════════
 # PHASE 5 — NOTIFICATION SLACK (toujours exécutée, même si le gate échoue)
 # ══════════════════════════════════════════════════════════════════════════════
