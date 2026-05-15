@@ -951,14 +951,14 @@ def generate_dashboard():
       border-color: var(--warn);
     }}
     /* ── CARTES D'ACTION ESTHÉTIQUES ── */
-    .action-grid {
+    .action-grid {{
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
       gap: 20px;
       margin: 20px 0 40px 0;
-    }
+    }}
 
-    .action-card {
+    .action-card {{
       display: flex;
       align-items: center;
       padding: 20px;
@@ -971,16 +971,15 @@ def generate_dashboard():
       position: relative;
       overflow: hidden;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
+    }}
 
-    /* Effet au survol */
-    .action-card:hover {
+    .action-card:hover {{
       transform: translateY(-5px);
       box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
       border-color: var(--accent);
-    }
+    }}
 
-    .action-icon {
+    .action-icon {{
       width: 48px;
       height: 48px;
       border-radius: 10px;
@@ -990,42 +989,41 @@ def generate_dashboard():
       font-size: 1.5rem;
       margin-right: 16px;
       flex-shrink: 0;
-    }
+    }}
 
-    .action-content {
+    .action-content {{
       flex-grow: 1;
-    }
+    }}
 
-    .action-title {
+    .action-title {{
       font-weight: 700;
       font-size: 1rem;
       margin-bottom: 4px;
       display: block;
-    }
+    }}
 
-    .action-desc {
+    .action-desc {{
       font-size: 0.85rem;
       opacity: 0.7;
-    }
+    }}
 
-    /* Couleurs spécifiques */
-    .card-slack { border-left: 5px solid #4A154B; }
-    .card-slack .action-icon { background: rgba(74, 21, 75, 0.1); color: #4A154B; }
+    .card-slack {{ border-left: 5px solid #4A154B; }}
+    .card-slack .action-icon {{ background: rgba(74, 21, 75, 0.1); color: #4A154B; }}
 
-    .card-gate { border-left: 5px solid #2563eb; }
-    .card-gate .action-icon { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+    .card-gate {{ border-left: 5px solid #2563eb; }}
+    .card-gate .action-icon {{ background: rgba(37, 99, 235, 0.1); color: #2563eb; }}
 
-    .action-arrow {
+    .action-arrow {{
       margin-left: 10px;
       opacity: 0;
       transition: transform 0.3s ease, opacity 0.3s ease;
       transform: translateX(-10px);
-    }
+    }}
 
-    .action-card:hover .action-arrow {
+    .action-card:hover .action-arrow {{
       opacity: 1;
       transform: translateX(0);
-    }    
+    }}    
     </style>
 
 <!-- ── THEME TOGGLE ── -->
