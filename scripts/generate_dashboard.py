@@ -950,6 +950,82 @@ def generate_dashboard():
       background: rgba(249,115,22,0.10);
       border-color: var(--warn);
     }}
+    /* ── CARTES D'ACTION ESTHÉTIQUES ── */
+    .action-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin: 20px 0 40px 0;
+    }
+
+    .action-card {
+      display: flex;
+      align-items: center;
+      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      text-decoration: none;
+      color: var(--text);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Effet au survol */
+    .action-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
+      border-color: var(--accent);
+    }
+
+    .action-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-right: 16px;
+      flex-shrink: 0;
+    }
+
+    .action-content {
+      flex-grow: 1;
+    }
+
+    .action-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .action-desc {
+      font-size: 0.85rem;
+      opacity: 0.7;
+    }
+
+    /* Couleurs spécifiques */
+    .card-slack { border-left: 5px solid #4A154B; }
+    .card-slack .action-icon { background: rgba(74, 21, 75, 0.1); color: #4A154B; }
+
+    .card-gate { border-left: 5px solid #2563eb; }
+    .card-gate .action-icon { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+
+    .action-arrow {
+      margin-left: 10px;
+      opacity: 0;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      transform: translateX(-10px);
+    }
+
+    .action-card:hover .action-arrow {
+      opacity: 1;
+      transform: translateX(0);
+    }    
     </style>
 
 <!-- ── THEME TOGGLE ── -->
@@ -1018,6 +1094,27 @@ def generate_dashboard():
     <div class="kpi">
       <div class="kpi-val" style="color:{'#ef4444' if checkov_data.get('Critical',0)+checkov_data.get('High',0)>0 else '#22c55e'}">{checkov_data.get('Critical',0)+checkov_data.get('High',0)}</div>
       <div class="kpi-lbl">🏗️ Issues IaC (Checkov)</div>
+    </div>
+  <div class="action-grid">
+    
+      <a href="https://app.slack.com/client/T0B0X732287/C0B1AJXL338" target="_blank" class="action-card card-slack">
+        <div class="action-icon">💬</div>
+        <div class="action-content">
+          <span class="action-title">Canal de Notification Slack</span>
+          <span class="action-desc">Consulter l'historique des alertes et les détails envoyés par le Bot.</span>
+        </div>
+        <div class="action-arrow">➜</div>
+      </a>
+
+      <a href="quality_gate_report.html" target="_blank" class="action-card card-gate">
+        <div class="action-icon">⚖️</div>
+        <div class="action-content">
+          <span class="action-title">Décision Quality Gate</span>
+          <span class="action-desc">Analyse détaillée des seuils de sécurité et score final de déploiement.</span>
+        </div>
+        <div class="action-arrow">➜</div>
+      </a>
+
     </div>
   </div>
 
