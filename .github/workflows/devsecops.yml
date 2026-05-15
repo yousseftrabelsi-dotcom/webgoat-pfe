@@ -389,7 +389,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: report-quality-gate
-          path: quality-gate-report.txt
+          path: |
+            quality-gate-report.html
+            quality-gate-report.txt
 
       # Avertissement informatif — le job reste vert même si le gate bloque
       - name: Quality Gate Status
