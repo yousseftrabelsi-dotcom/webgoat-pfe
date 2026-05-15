@@ -7,7 +7,6 @@
 # PHASE 4 │ Quality Gate      : bloque le pipeline si seuils dépassés
 # PHASE 5 │ Notification      : résumé Slack après chaque run
 # ══════════════════════════════════════════════════════════════════════════════
-
 name: DevSecOps WebGoat Pipeline
 
 on:
