@@ -57,41 +57,51 @@ def parse_sonar(path: str = "sonar-results.json") -> dict:
     return data
 
 
-def parse_zap(path: str = "report_html.html") -> dict:
-    demo = {"CORS": 11, "CSRF": 5, "Session": 1, "Auth": 1}
+def parse_zap(path: str = "report_json.json") -> dict:
     counts = {"High": 0, "Medium": 0, "Low": 0, "Informational": 0}
-    if not os.path.isfile(path):
-        print(f"[WARN] ZAP : fichier introuvable — valeurs démo utilisées.", file=sys.stderr)
-        return demo
 
-    # Tentative JSON
-    try:
-        with open(path, encoding="utf-8") as fh:
-            data = json.load(fh)
-        for site in data.get("site", []):
-            for alert in site.get("alerts", []):
-                risk = alert.get("riskdesc", "").split(" ")[0]
-                if risk in counts:
-                    counts[risk] += 1
-        return counts
-    except json.JSONDecodeError:
-        pass
-    except Exception as exc:
-        print(f"[ERROR] ZAP JSON : {exc}", file=sys.stderr)
+    # 1. Essai avec report_json.json (source principale)
+    for candidate in ("report_json.json", "report_html.html"):
+        if not os.path.isfile(candidate):
+            continue
+        try:
+            with open(candidate, encoding="utf-8") as fh:
+                data = json.load(fh)
+            found = False
+            for site in data.get("site", []):
+                for alert in site.get("alerts", []):
+                    # riskdesc peut être "Medium (2)" ou "Medium" → on prend le 1er mot
+                    risk = alert.get("riskdesc", "").split(" ")[0].capitalize()
+                    if risk in counts:
+                        counts[risk] += 1
+                        found = True
+            if found or candidate == "report_json.json":
+                print(f"[INFO] ZAP : {sum(counts.values())} alertes depuis {candidate}")
+                return counts
+        except json.JSONDecodeError:
+            continue
+        except Exception as exc:
+            print(f"[ERROR] ZAP ({candidate}) : {exc}", file=sys.stderr)
 
-    # Fallback : extraction HTML par regex
-    try:
-        with open(path, encoding="utf-8") as fh:
-            html = fh.read()
-        for risk in list(counts.keys()):
-            m = re.search(
-                rf'<td[^>]*>\s*{risk}\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>',
-                html, re.IGNORECASE,
-            )
-            if m:
-                counts[risk] = int(m.group(1))
-    except Exception as exc:
-        print(f"[ERROR] ZAP HTML : {exc}", file=sys.stderr)
+    # 2. Fallback HTML regex
+    html_path = "report_html.html"
+    if os.path.isfile(html_path):
+        try:
+            with open(html_path, encoding="utf-8") as fh:
+                html = fh.read()
+            for risk in list(counts.keys()):
+                m = re.search(
+                    rf'<td[^>]*>\s*{risk}\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>',
+                    html, re.IGNORECASE,
+                )
+                if m:
+                    counts[risk] = int(m.group(1))
+            print(f"[INFO] ZAP : fallback HTML regex utilisé")
+            return counts
+        except Exception as exc:
+            print(f"[ERROR] ZAP HTML fallback : {exc}", file=sys.stderr)
+
+    print("[WARN] ZAP : aucun rapport trouvé — compteurs à zéro.", file=sys.stderr)
     return counts
 
 
@@ -619,20 +629,22 @@ def generate_dashboard():
     }
 
     # ── Figures Plotly ────────────────────────────────────────────
-    f_sca   = fig_sca(trivy_data)
-    f_sast  = fig_sast(sonar_data)
-    f_dast  = fig_dast(zap_data)
-    f_falco = fig_falco(falco_data)
-    f_sec   = fig_secrets(gitleaks_cnt)
-    f_trend = fig_trend()
+    f_sca     = fig_sca(trivy_data)
+    f_sast    = fig_sast(sonar_data)
+    f_dast    = fig_dast(zap_data)
+    f_falco   = fig_falco(falco_data)
+    f_sec     = fig_secrets(gitleaks_cnt)
+    f_trend   = fig_trend()
+    f_checkov = fig_checkov(checkov_data)
 
     # Grille principale (dashboard)
-    g_sca   = f_sca.to_html(full_html=False, include_plotlyjs=False)
-    g_sast  = f_sast.to_html(full_html=False, include_plotlyjs=False)
-    g_dast  = f_dast.to_html(full_html=False, include_plotlyjs=False)
-    g_falco = f_falco.to_html(full_html=False, include_plotlyjs=False)
-    g_sec   = f_sec.to_html(full_html=False, include_plotlyjs=False)
-    g_trend = f_trend.to_html(full_html=False, include_plotlyjs=False)
+    g_sca     = f_sca.to_html(full_html=False, include_plotlyjs=False)
+    g_sast    = f_sast.to_html(full_html=False, include_plotlyjs=False)
+    g_dast    = f_dast.to_html(full_html=False, include_plotlyjs=False)
+    g_falco   = f_falco.to_html(full_html=False, include_plotlyjs=False)
+    g_sec     = f_sec.to_html(full_html=False, include_plotlyjs=False)
+    g_trend   = f_trend.to_html(full_html=False, include_plotlyjs=False)
+    g_checkov = f_checkov.to_html(full_html=False, include_plotlyjs=False)
 
     # Copies dédiées au rapport IA (IDs Plotly distincts)
     ai_sca     = f_sca.to_html(full_html=False, include_plotlyjs=False)
@@ -640,7 +652,7 @@ def generate_dashboard():
     ai_dast    = f_dast.to_html(full_html=False, include_plotlyjs=False)
     ai_falco   = f_falco.to_html(full_html=False, include_plotlyjs=False)
     ai_sec     = f_sec.to_html(full_html=False, include_plotlyjs=False)
-    ai_checkov = fig_checkov(checkov_data).to_html(full_html=False, include_plotlyjs=False)
+    ai_checkov = f_checkov.to_html(full_html=False, include_plotlyjs=False)
 
     # ── Rapport IA : Markdown → HTML + graphiques ─────────────────
     ai_html = md_to_html(ai_raw)
@@ -836,9 +848,13 @@ def generate_dashboard():
     .ai-box {{
       background: linear-gradient(135deg, rgba(6,182,212,.04) 0%, rgba(99,102,241,.04) 100%);
       border: 1px solid rgba(6,182,212,.15);
-      border-radius: 12px; padding: 24px;
+      border-radius: 12px; padding: 28px 36px;
       font-family: 'Space Grotesk', sans-serif;
-      font-size: .75rem; color: var(--muted); line-height: 1.75;
+      font-size: .88rem; color: var(--muted); line-height: 1.85;
+    }}
+    .ai-wrapper {{
+      max-width: 900px;
+      margin: 0 auto;
     }}
     .ai-badge {{
       font-size: .7rem; background: rgba(6,182,212,.15); color: var(--accent);
@@ -870,70 +886,6 @@ def generate_dashboard():
       color: var(--muted); border-top: 1px solid var(--border); margin-top: 40px;
     }}
     footer a {{ color: var(--accent); text-decoration: none; }}
-
-    /* ── LIVE DOT ── */
-    .live-dot {{
-      display: inline-block; width: 7px; height: 7px;
-      border-radius: 50%; background: var(--ok);
-      margin-right: 6px; vertical-align: middle;
-      animation: livePulse 2s ease-in-out infinite;
-    }}
-    @keyframes livePulse {{
-      0%, 100% {{ box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }}
-      50%       {{ box-shadow: 0 0 0 6px rgba(34,197,94,0); }}
-    }}
-
-    /* ── CURSOR BLINK ── */
-    .cursor-blink {{
-      display: inline-block; width: 2px; height: 1em;
-      background: var(--accent); margin-left: 3px;
-      vertical-align: middle;
-      animation: cursorBlink .9s step-end infinite;
-    }}
-    @keyframes cursorBlink {{
-      0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0; }}
-    }}
-
-    /* ── HEADER EYEBROW ── */
-    .header-eyebrow {{
-      font-family: 'JetBrains Mono', monospace;
-      font-size: .65rem; letter-spacing: .2em;
-      color: var(--accent); text-transform: uppercase;
-      margin-bottom: 8px;
-      display: flex; align-items: center; gap: 6px;
-    }}
-
-    /* ── RISK STATUS BADGE (remplace .badge Bootstrap) ── */
-    .risk-status-pill {{
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 4px 14px; border-radius: 6px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: .75rem; font-weight: 700;
-      letter-spacing: .08em; text-transform: uppercase;
-      border: 1px solid currentColor;
-      margin-bottom: 6px;
-    }}
-    .risk-status-pill.blocking {{
-      color: var(--danger);
-      background: rgba(239,68,68,0.12);
-      border-color: var(--danger);
-      box-shadow: 0 0 12px rgba(239,68,68,0.2);
-      animation: dangerPulse 2s ease-in-out infinite;
-    }}
-    @keyframes dangerPulse {{
-      0%, 100% {{ box-shadow: 0 0 8px rgba(239,68,68,0.2); }}
-      50%       {{ box-shadow: 0 0 18px rgba(239,68,68,0.45); }}
-    }}
-    .risk-status-pill.ok {{
-      color: var(--ok);
-      background: rgba(34,197,94,0.10);
-      border-color: var(--ok);
-    }}
-    .risk-status-pill.high {{
-      color: var(--warn);
-      background: rgba(249,115,22,0.10);
-      border-color: var(--warn);
-    }}
   </style>
 </head>
 <body>
@@ -946,10 +898,7 @@ def generate_dashboard():
 
 <!-- ── HEADER ── -->
 <div class="dash-header">
-  <div class="header-eyebrow">
-    <span class="live-dot"></span>DevSecOps Pipeline &nbsp;·&nbsp; Live Threat Report
-  </div>
-  <h1>🛡️ DevSecOps <span>Executive</span> Dashboard<span class="cursor-blink"></span></h1>
+  <h1>🛡️ DevSecOps <span>Executive</span> Dashboard</h1>
   <p>Pipeline CI/CD — Projet WebGoat</p>
   <div class="meta-row">
     <span class="meta-pill">🔀 {meta['branch']}</span>
@@ -968,7 +917,7 @@ def generate_dashboard():
   <div class="risk-banner mb-4">
     <div class="risk-score">{risk['score']}<small>/100</small></div>
     <div>
-      <span class="risk-status-pill {'blocking' if risk['score'] >= 70 or 'BLOQUANT' in risk['status'] else ('ok' if risk['score'] < 40 else 'high')}">{risk['status']}</span>
+      <span class="badge mb-1 fs-6" style="background:{risk['color']};color:#fff">{risk['status']}</span>
       <p style="color:var(--muted);font-size:.82rem;margin:0">{risk['reason']}</p>
     </div>
     <div class="risk-bar-outer"><div class="risk-bar-inner"></div></div>
@@ -1007,10 +956,21 @@ def generate_dashboard():
     </div>
   </div>
 
-  <!-- ── GRAPHIQUES 3+3 ── -->
-=======
-  <!-- ── GRAPHIQUES 3 + 3 ── -->
+  <!-- ── GRAPHIQUES DE SÉCURITÉ ── -->
   <div class="section-label">Graphiques de sécurité</div>
+
+  <!-- Tendance centré au-dessus des 6 graphes -->
+  <div class="row g-3 mb-3 justify-content-center">
+    <div class="col-md-6">
+      <div class="card-dark h-100">
+        <div class="card-title">📈 Tendance Sécurité</div>
+        {g_trend}
+        <div class="note">Réduction progressive des vulnérabilités sur les derniers runs.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ligne 1 : SCA · SAST · DAST -->
   <div class="row g-3 mb-3">
     <div class="col-md-4">
       <div class="card-dark h-100">
@@ -1034,8 +994,8 @@ def generate_dashboard():
       </div>
     </div>
   </div>
-=======
 
+  <!-- Ligne 2 : Falco · Secrets · IaC -->
   <div class="row g-3 mb-4">
     <div class="col-md-4">
       <div class="card-dark h-100">
@@ -1053,30 +1013,11 @@ def generate_dashboard():
     </div>
     <div class="col-md-4">
       <div class="card-dark h-100">
-        <div class="card-title">📈 Tendance Sécurité</div>
-        {g_trend}
-        <div class="note">Réduction progressive des vulnérabilités.</div>
+        <div class="card-title">🏗️ IaC — Checkov</div>
+        {g_checkov}
+        <div class="note">Misconfigurations détectées dans les fichiers IaC.</div>
       </div>
     </div>
-  </div>
-
-  <!-- ── RAPPORT IA ── -->
-  <div class="section-label">Synthèse Intelligence Artificielle</div>
-  <div class="card-dark mb-4">
-    <div class="card-title">
-      🤖 Rapport IA Corrélé
-      <span class="ai-badge">SCA · SAST · DAST · Runtime · Secrets</span>
-=======
-  <!-- ── AI SUMMARY ── -->
-  <div class="section-label">Synthèse Intelligence Artificielle</div>
-  <div class="card-dark mb-4">
-    <div class="card-title">🤖 Rapport IA Corrélé
-      <span style="font-size:.7rem;background:rgba(6,182,212,0.15);color:var(--accent);
-                   padding:2px 10px;border-radius:10px;margin-left:auto">
-        SCA · SAST · DAST · Runtime · Secrets
-      </span>
-    </div>
-    <div class="ai-box">{ai_html}</div>
   </div>
 
   <!-- ── MATRICE OWASP TOP 10 ── -->
@@ -1094,7 +1035,18 @@ def generate_dashboard():
     {owasp_matrix}
   </div>
 
-  <footer>
+<!-- ── SYNTHÈSE IA ── -->
+  <div class="section-label">Synthèse Intelligence Artificielle</div>
+  <div class="ai-wrapper mb-4">
+    <div class="card-dark">
+      <div class="card-title">🤖 Rapport IA Corrélé
+        <span class="ai-badge">SCA · SAST · DAST · Runtime · Secrets · IaC</span>
+      </div>
+      <div class="ai-box">{ai_html}</div>
+    </div>
+  </div>
+
+    <footer>
     Généré automatiquement par GitHub Actions — Run #{meta['run']} —
     <a href="{meta['run_url']}" target="_blank">Voir le pipeline complet</a>
   </footer>
