@@ -224,279 +224,407 @@ def main():
     run_url = os.environ.get("GITHUB_RUN_URL", "#")
     run_num = os.environ.get("GITHUB_RUN_NUMBER", "—")
 
-    # Couleur globale selon décision
-    gate_color  = "#00ffa3" if all_passed else "#ff3d5a"
-    gate_icon   = "✅" if all_passed else "🚫"
-    gate_label  = "DÉPLOIEMENT AUTORISÉ" if all_passed else "DÉPLOIEMENT BLOQUÉ"
+    gate_icon  = "✅" if all_passed else "🚫"
+    gate_label = "DÉPLOIEMENT AUTORISÉ" if all_passed else "DÉPLOIEMENT BLOQUÉ"
+    pill_class = "ok" if all_passed else ("high" if score < 70 else "blocking")
 
-    # Score ring — stroke-dasharray trick
-    circumference = 2 * 3.14159 * 52  # r=52
-    dash_fill = (score / 100) * circumference
-    score_color = "#00ffa3" if score < 40 else ("#ff8c00" if score < 70 else "#ff3d5a")
+    circumference = 2 * 3.14159 * 52
+    dash_fill   = (score / 100) * circumference
+    score_color = "#22c55e" if score < 40 else ("#f97316" if score < 70 else "#ef4444")
+    risk_reason = (
+        f"{secrets} secret(s) en clair — déploiement bloqué immédiatement." if secrets > 0
+        else "Vulnérabilités critiques — action immédiate requise." if score >= 70
+        else "Risques significatifs à corriger avant tout déploiement." if score >= 40
+        else "Aucune vulnérabilité critique détectée."
+    )
 
     def check_row(c):
-        bg    = "rgba(0,255,163,0.04)"  if c["passed"] else "rgba(255,61,90,0.06)"
-        dot   = "#00ffa3"               if c["passed"] else "#ff3d5a"
-        sym   = "✅ PASS"               if c["passed"] else "❌ FAIL"
-        sym_c = "#00ffa3"               if c["passed"] else "#ff3d5a"
-        # Progression = valeur / max * 100  (ex: 47/50 → 94%)
-        # Si max=0 et valeur>0 : 100% (dépassement total)
-        # Si max=0 et valeur=0 : 0%  (rien détecté = OK)
+        dot_c = "#22c55e" if c["passed"] else "#ef4444"
+        sym_c = "#22c55e" if c["passed"] else "#ef4444"
+        sym   = "✅ PASS"  if c["passed"] else "❌ FAIL"
+        row_bg = "rgba(34,197,94,0.03)" if c["passed"] else "rgba(239,68,68,0.04)"
         if c["max_allowed"] > 0:
             bar_w = min(100, round(c["value"] / c["max_allowed"] * 100))
         else:
             bar_w = 100 if c["value"] > 0 else 0
-        bar_c = dot
-        return f"""
-        <tr style="background:{bg};border-bottom:1px solid rgba(0,200,255,0.07)">
-          <td style="padding:11px 14px;font-size:.78rem;color:#cfe8ff">
-            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:{dot};margin-right:8px;box-shadow:0 0 6px {dot}"></span>
+        return f"""<tr style="background:{row_bg}">
+          <td style="padding:12px 16px;font-size:.82rem;color:var(--text);display:flex;align-items:center;gap:10px">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{dot_c};box-shadow:0 0 5px {dot_c};flex-shrink:0"></span>
             {c['label']}
           </td>
-          <td style="padding:11px 14px;text-align:center;font-weight:700;color:{sym_c};font-size:.85rem;letter-spacing:.05em">{c['value']}</td>
-          <td style="padding:11px 14px;text-align:center;color:#5a8aaa;font-size:.78rem">{c['max_allowed']}</td>
-          <td style="padding:11px 14px;min-width:120px">
-            <div style="background:rgba(255,255,255,0.05);border-radius:3px;height:4px;overflow:hidden">
-              <div style="width:{bar_w}%;height:100%;background:{bar_c};border-radius:3px;transition:width .8s ease"></div>
+          <td style="padding:12px 16px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:.9rem;font-weight:700;color:{sym_c}">{c['value']}</td>
+          <td style="padding:12px 16px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--muted)">{c['max_allowed']}</td>
+          <td style="padding:12px 16px;min-width:120px">
+            <div style="background:rgba(255,255,255,0.07);border-radius:3px;height:5px;overflow:hidden">
+              <div style="width:{bar_w}%;height:100%;background:{dot_c};border-radius:3px;transition:width .8s ease"></div>
             </div>
           </td>
-          <td style="padding:11px 14px;text-align:right;font-size:.75rem;color:{sym_c};font-weight:600;letter-spacing:.08em">{sym}</td>
+          <td style="padding:12px 16px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.75rem;font-weight:700;color:{sym_c};letter-spacing:.08em">{sym}</td>
         </tr>"""
 
     rows_html = "".join(check_row(c) for c in checks)
 
-    # Seuils table
     def thresh_row(key, val):
-        return f"""<tr style="border-bottom:1px solid rgba(0,200,255,0.05)">
-          <td style="padding:7px 14px;color:#5a8aaa;font-size:.72rem;font-family:'IBM Plex Mono',monospace">{key}</td>
-          <td style="padding:7px 14px;text-align:right;color:#00c8ff;font-size:.72rem;font-family:'IBM Plex Mono',monospace;font-weight:600">{val}</td>
+        return f"""<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:9px 16px;font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--muted)">{key}</td>
+          <td style="padding:9px 16px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.75rem;font-weight:600;color:var(--accent)">{val}</td>
         </tr>"""
     thresh_html = "".join(thresh_row(k, v) for k, v in THRESHOLDS.items())
 
-    html = f"""<!DOCTYPE html>
+        html = f"""<!DOCTYPE html>
 <html lang="fr" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Quality Gate — Run #{run_num}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     :root {{
-      --bg:#020b18;--surface:#071428;--surface2:#0c1f3a;
-      --border:rgba(0,200,255,0.10);--border2:rgba(0,200,255,0.22);
-      --accent:#00c8ff;--muted:#5a8aaa;--text:#cfe8ff;
-      --font-h:'Syne',sans-serif;--font-m:'IBM Plex Mono',monospace;
+      --bg:       #0a0f1e;
+      --surface:  #0f172a;
+      --surface2: #1e293b;
+      --border:   rgba(255,255,255,0.07);
+      --accent:   #38bdf8;
+      --accent2:  #818cf8;
+      --danger:   #ef4444;
+      --warn:     #f97316;
+      --ok:       #22c55e;
+      --text:     #e2e8f0;
+      --muted:    #94a3b8;
     }}
-    [data-theme="light"]{{
-      --bg:#f0f6ff;--surface:#ffffff;--surface2:#ddeeff;
-      --border:rgba(0,100,200,0.10);--border2:rgba(0,100,200,0.25);
-      --accent:#0077cc;--muted:#4a6a8a;--text:#0f2a45;
+    [data-theme="light"] {{
+      --bg:       #f1f5f9;
+      --surface:  #ffffff;
+      --surface2: #e2e8f0;
+      --border:   rgba(0,0,0,0.08);
+      --accent:   #0284c7;
+      --accent2:  #6366f1;
+      --danger:   #dc2626;
+      --warn:     #ea580c;
+      --ok:       #16a34a;
+      --text:     #1e293b;
+      --muted:    #475569;
     }}
-    *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
-    body{{background:var(--bg);color:var(--text);font-family:var(--font-m);
-          min-height:100vh;overflow-x:hidden;transition:background .3s,color .3s}}
-    body::before{{content:'';position:fixed;inset:0;z-index:0;
-      background-image:linear-gradient(rgba(0,200,255,0.025) 1px,transparent 1px),
-        linear-gradient(90deg,rgba(0,200,255,0.025) 1px,transparent 1px);
-      background-size:40px 40px;animation:gp 8s ease-in-out infinite;pointer-events:none}}
-    [data-theme="light"] body::before{{background-image:
-      linear-gradient(rgba(0,100,200,0.04) 1px,transparent 1px),
-      linear-gradient(90deg,rgba(0,100,200,0.04) 1px,transparent 1px)}}
-    @keyframes gp{{0%,100%{{opacity:1}}50%{{opacity:.4}}}}
-    .wrap{{position:relative;z-index:2;max-width:860px;margin:0 auto;padding:32px 24px 60px}}
-
-    /* Header */
-    .qg-header{{background:linear-gradient(160deg,#020d1e,#061830,#020d1e);
-      border:1px solid var(--border2);border-radius:14px;padding:28px 32px;
-      margin-bottom:28px;position:relative;overflow:hidden}}
-    [data-theme="light"] .qg-header{{background:linear-gradient(160deg,#ddeeff,#c8e0f8,#ddeeff)}}
-    .qg-header::before{{content:'';position:absolute;width:400px;height:400px;
-      background:radial-gradient(circle,rgba(0,200,255,0.06) 0%,transparent 70%);
-      top:-150px;right:-80px;pointer-events:none}}
-    .eyebrow{{font-size:.62rem;letter-spacing:.22em;color:var(--accent);
-      text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}}
-    .eyebrow::before{{content:'';display:inline-block;width:18px;height:1px;background:var(--accent)}}
-    .qg-title{{font-family:var(--font-h);font-size:1.6rem;font-weight:800;color:var(--text);
-      letter-spacing:-.01em;line-height:1.1}}
-    .qg-title span{{color:var(--accent)}}
-    .meta-pills{{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}}
-    .pill{{background:rgba(0,200,255,0.06);border:1px solid var(--border2);
-      border-radius:5px;padding:3px 10px;font-size:.67rem;color:var(--muted)}}
-    .pill a{{color:var(--accent);text-decoration:none}}
-
-    /* Theme toggle */
-    #tgl{{position:fixed;top:16px;right:16px;z-index:9999;display:flex;gap:5px}}
-    .tb{{width:34px;height:30px;border:1px solid var(--border2);background:var(--surface);
-      color:var(--accent);border-radius:7px;cursor:pointer;font-size:13px;
-      display:flex;align-items:center;justify-content:center;transition:all .2s}}
-    .tb:hover,.tb.active{{box-shadow:0 0 10px rgba(0,200,255,0.3);border-color:var(--accent)}}
-
-    /* Decision banner */
-    .decision{{border-radius:12px;padding:20px 26px;margin-bottom:24px;
-      border-left:4px solid {gate_color};background:var(--surface);
-      display:flex;align-items:center;gap:20px;flex-wrap:wrap;
-      box-shadow:0 0 24px rgba(0,200,255,0.06)}}
-    .decision-icon{{font-size:2rem}}
-    .decision-label{{font-family:var(--font-h);font-size:1.15rem;font-weight:800;
-      color:{gate_color};letter-spacing:.02em}}
-    .decision-sub{{font-size:.72rem;color:var(--muted);margin-top:3px}}
-
-    /* Score ring */
-    .score-ring{{position:relative;width:110px;height:110px;flex-shrink:0}}
-    .score-ring svg{{transform:rotate(-90deg)}}
-    .score-center{{position:absolute;inset:0;display:flex;flex-direction:column;
-      align-items:center;justify-content:center}}
-    .score-num{{font-family:var(--font-h);font-size:1.5rem;font-weight:800;
-      color:{score_color};line-height:1}}
-    .score-sub{{font-size:.6rem;color:var(--muted);letter-spacing:.08em}}
-
-    /* Checks table */
-    .section-lbl{{font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;
-      color:var(--accent);margin:24px 0 12px;display:flex;align-items:center;gap:10px}}
-    .section-lbl::before{{content:'//';color:#7c3aed}}
-    .section-lbl::after{{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent)}}
-    .card{{background:var(--surface);border:1px solid var(--border);border-radius:12px;
-      overflow:hidden;transition:border-color .3s,box-shadow .3s}}
-    .card:hover{{border-color:var(--border2);box-shadow:0 0 20px rgba(0,200,255,0.08)}}
-    table{{width:100%;border-collapse:collapse}}
-    thead tr{{background:rgba(0,200,255,0.05)}}
-    thead th{{padding:10px 14px;font-size:.67rem;letter-spacing:.12em;
-      text-transform:uppercase;color:var(--muted);text-align:left;
-      border-bottom:1px solid var(--border2)}}
-    thead th:nth-child(2),thead th:nth-child(3){{text-align:center}}
-    thead th:last-child{{text-align:right}}
-
-    /* Thresholds */
-    .thresh-grid{{display:grid;grid-template-columns:1fr 1fr;gap:0}}
-
-    /* Footer */
-    footer{{text-align:center;margin-top:36px;font-size:.67rem;color:var(--muted);
-      border-top:1px solid var(--border);padding-top:20px;position:relative}}
-    footer::before{{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
-      width:60px;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}}
-    footer a{{color:var(--accent);text-decoration:none}}
-    .pill-dashboard{{
-      background:rgba(56,189,248,0.12)!important;
-      border:1px solid rgba(56,189,248,0.5)!important;
-      color:#38bdf8!important;font-weight:600;
-      text-decoration:none;cursor:pointer;
-      border-radius:20px;padding:3px 12px;
-      font-family:'JetBrains Mono',monospace;font-size:.72rem;
-      transition:all .2s;display:inline-flex;align-items:center;
+    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{
+      background: var(--bg); color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 14px; line-height: 1.6;
+      min-height: 100vh; transition: background .3s, color .3s;
     }}
-    .pill-dashboard:hover{{
-      background:rgba(56,189,248,0.22)!important;
-      box-shadow:0 0 12px rgba(56,189,248,0.3);
-      transform:translateY(-1px);
-    }}
-    [data-theme="light"] .pill-dashboard{{
-      background:rgba(2,132,199,0.10)!important;
-      border-color:rgba(2,132,199,0.4)!important;
-      color:#0284c7!important;
-    }}
-    .live{{display:inline-block;width:6px;height:6px;border-radius:50%;
-      background:#00ffa3;margin-right:6px;
-      animation:pulse 2s ease-in-out infinite}}
-    @keyframes pulse{{0%,100%{{box-shadow:0 0 0 0 rgba(0,255,163,.5)}}50%{{box-shadow:0 0 0 5px rgba(0,255,163,0)}}}}
 
-    /* Animations */
-    .fade-in{{opacity:0;transform:translateY(16px);
-      animation:fadeUp .5s ease forwards}}
-    @keyframes fadeUp{{to{{opacity:1;transform:translateY(0)}}}}
-    .d1{{animation-delay:.05s}}.d2{{animation-delay:.12s}}
-    .d3{{animation-delay:.18s}}.d4{{animation-delay:.24s}}
+    /* ── THEME TOGGLE ── */
+    #theme-toggle {{
+      position: fixed; top: 20px; right: 20px; z-index: 9999;
+      display: flex; gap: 8px;
+    }}
+    .theme-btn {{
+      width: 44px; height: 36px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text);
+      border-radius: 22px; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .25s;
+    }}
+    .theme-btn:hover  {{ transform: translateY(-2px); border-color: var(--accent); }}
+    .theme-btn.active {{ border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }}
+
+    /* ── HEADER ── */
+    .dash-header {{
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #0f172a 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 28px 40px 22px;
+      position: relative; overflow: hidden;
+    }}
+    [data-theme="light"] .dash-header {{
+      background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 60%, #e0f2fe 100%);
+    }}
+    .dash-header::before {{
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 70% 50%, rgba(56,189,248,.08) 0%, transparent 60%);
+      pointer-events: none;
+    }}
+    .header-eyebrow {{
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .65rem; letter-spacing: .2em; color: var(--accent);
+      text-transform: uppercase; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 6px;
+    }}
+    .dash-header h1 {{
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.5rem; font-weight: 700; letter-spacing: .04em; color: #f8fafc;
+    }}
+    [data-theme="light"] .dash-header h1 {{ color: #0f172a; }}
+    .dash-header h1 span {{ color: #7dd3fc; }}
+    .dash-header p {{ color: var(--muted); font-size: .85rem; margin-top: 4px; }}
+    .meta-row {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }}
+    .meta-pill {{
+      background: rgba(255,255,255,.06); border: 1px solid var(--border);
+      border-radius: 20px; padding: 3px 12px;
+      font-family: 'JetBrains Mono', monospace; font-size: .72rem; color: var(--muted);
+      transition: all .2s;
+    }}
+    [data-theme="light"] .meta-pill {{ background: rgba(0,0,0,.04); }}
+    .meta-pill a {{ color: var(--accent); text-decoration: none; }}
+    .meta-pill-dashboard {{
+      background: rgba(56,189,248,0.10);
+      border: 1px solid rgba(56,189,248,0.4);
+      border-radius: 20px; padding: 4px 14px;
+      font-family: 'JetBrains Mono', monospace; font-size: .72rem;
+      color: var(--accent); font-weight: 600;
+      text-decoration: none; cursor: pointer;
+      transition: all .2s; display: inline-flex; align-items: center; gap: 5px;
+    }}
+    .meta-pill-dashboard:hover {{
+      background: rgba(56,189,248,0.2);
+      box-shadow: 0 0 12px rgba(56,189,248,0.25);
+      transform: translateY(-1px);
+      color: var(--accent);
+    }}
+
+    /* ── SECTION LABEL ── */
+    .section-label {{
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .68rem; font-weight: 700; letter-spacing: .14em;
+      text-transform: uppercase; color: var(--muted);
+      margin: 32px 0 12px;
+      display: flex; align-items: center; gap: 10px;
+    }}
+    .section-label::after {{
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }}
+
+    /* ── CARDS ── */
+    .card-dark {{
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; overflow: hidden;
+      transition: border-color .25s;
+    }}
+    .card-dark:hover {{ border-color: rgba(56,189,248,.25); }}
+    .card-title {{
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .75rem; font-weight: 600; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--muted);
+      padding: 14px 18px 12px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }}
+
+    /* ── DECISION BANNER ── */
+    .decision-banner {{
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px 28px;
+      display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+    }}
+
+    /* ── SCORE RING ── */
+    .score-ring {{ position: relative; width: 120px; height: 120px; flex-shrink: 0; }}
+    .score-ring svg {{ transform: rotate(-90deg); }}
+    .score-center {{
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }}
+    .score-num {{
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.8rem; font-weight: 700; line-height: 1;
+    }}
+    .score-sub {{ font-size: .65rem; color: var(--muted); margin-top: 2px; }}
+
+    /* ── STATUS PILL ── */
+    .risk-status-pill {{
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 16px; border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .75rem; font-weight: 700;
+      letter-spacing: .1em; text-transform: uppercase;
+      border: 1px solid currentColor; margin-bottom: 6px;
+    }}
+    .risk-status-pill.blocking {{
+      color: var(--danger); background: rgba(239,68,68,0.10);
+      border-color: var(--danger);
+      animation: dangerPulse 2s ease-in-out infinite;
+    }}
+    @keyframes dangerPulse {{
+      0%, 100% {{ box-shadow: 0 0 8px rgba(239,68,68,0.2); }}
+      50%       {{ box-shadow: 0 0 20px rgba(239,68,68,0.5); }}
+    }}
+    .risk-status-pill.ok   {{ color:var(--ok);   background:rgba(34,197,94,0.08);  border-color:var(--ok);   }}
+    .risk-status-pill.high {{ color:var(--warn);  background:rgba(249,115,22,0.08); border-color:var(--warn); }}
+    .decision-reason {{ font-size: .82rem; color: var(--muted); margin: 0; }}
+
+    /* ── RISK BAR ── */
+    .risk-bar-outer {{
+      flex: 1; min-width: 120px; height: 7px;
+      background: rgba(255,255,255,.07); border-radius: 4px; overflow: hidden;
+    }}
+    [data-theme="light"] .risk-bar-outer {{ background: rgba(0,0,0,.07); }}
+    .risk-bar-inner {{
+      height: 100%; border-radius: 4px;
+      transition: width .8s cubic-bezier(.4,0,.2,1);
+    }}
+
+    /* ── CHECKS TABLE ── */
+    .checks-table {{ width: 100%; border-collapse: collapse; }}
+    .checks-table thead tr {{ background: rgba(56,189,248,0.05); }}
+    .checks-table thead th {{
+      padding: 11px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .67rem; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--muted);
+      border-bottom: 1px solid var(--border); font-weight: 600;
+    }}
+    .checks-table thead th:nth-child(2),
+    .checks-table thead th:nth-child(3) {{ text-align: center; }}
+    .checks-table thead th:last-child {{ text-align: right; padding-right: 16px; }}
+    .checks-table tbody tr {{ border-bottom: 1px solid var(--border); transition: background .15s; }}
+    .checks-table tbody tr:hover {{ background: rgba(255,255,255,0.02); }}
+    .checks-table tbody tr:last-child {{ border-bottom: none; }}
+
+    /* ── THRESHOLDS ── */
+    .thresh-table {{ width: 100%; border-collapse: collapse; }}
+    .thresh-table tr {{ border-bottom: 1px solid var(--border); }}
+    .thresh-table tr:last-child {{ border-bottom: none; }}
+
+    /* ── LIVE DOT ── */
+    .live-dot {{
+      display: inline-block; width: 7px; height: 7px;
+      border-radius: 50%; background: var(--ok);
+      margin-right: 2px; vertical-align: middle;
+      animation: livePulse 2s ease-in-out infinite;
+    }}
+    @keyframes livePulse {{
+      0%, 100% {{ box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }}
+      50%       {{ box-shadow: 0 0 0 6px rgba(34,197,94,0); }}
+    }}
+    .cursor-blink {{
+      display: inline-block; width: 2px; height: 1em;
+      background: var(--accent); margin-left: 3px; vertical-align: middle;
+      animation: cursorBlink .9s step-end infinite;
+    }}
+    @keyframes cursorBlink {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0; }} }}
+
+    /* ── NOTE ── */
+    .note {{
+      background: rgba(255,255,255,.03);
+      border-left: 2px solid rgba(148,163,184,.3);
+      padding: 7px 12px; font-size: .75rem; color: var(--muted);
+      border-radius: 0 6px 6px 0; margin-top: 10px;
+    }}
+
+    /* ── FOOTER ── */
+    footer {{
+      text-align: center; padding: 28px 0 20px;
+      font-family: 'JetBrains Mono', monospace; font-size: .72rem;
+      color: var(--muted); border-top: 1px solid var(--border); margin-top: 40px;
+    }}
+    footer a {{ color: var(--accent); text-decoration: none; }}
   </style>
 </head>
 <body>
 
-<div id="tgl">
-  <button id="dm" class="tb active" title="Dark">🌙</button>
-  <button id="lm" class="tb"        title="Light">☀️</button>
+<div id="theme-toggle">
+  <button id="dark-mode"  class="theme-btn active" title="Dark Mode">🌙</button>
+  <button id="light-mode" class="theme-btn"        title="Light Mode">☀️</button>
 </div>
 
-<div class="wrap">
-
-  <!-- Header -->
-  <div class="qg-header fade-in d1">
-    <div class="eyebrow"><span class="live"></span>DevSecOps Pipeline · Quality Gate</div>
-    <div class="qg-title">🚦 Quality <span>Gate</span> Report</div>
-    <div class="meta-pills">
-      <span class="pill">🔢 Run #{run_num}</span>
-      <span class="pill">🕐 {timestamp}</span>
-      <span class="pill"><a href="{run_url}" target="_blank">🔗 GitHub Actions</a></span>
-      <a href="global_security_report.html" class="pill pill-dashboard" title="Voir le dashboard de sécurité complet">
-        📊 Dashboard Final
-      </a>
-    </div>
+<div class="dash-header">
+  <div class="header-eyebrow">
+    <span class="live-dot"></span>DevSecOps Pipeline &nbsp;·&nbsp; Quality Gate
   </div>
+  <h1>🚦 Quality <span>Gate</span> Report<span class="cursor-blink"></span></h1>
+  <p>Pipeline CI/CD — Projet WebGoat</p>
+  <div class="meta-row">
+    <span class="meta-pill">🔢 Run #{run_num}</span>
+    <span class="meta-pill">🕐 {timestamp}</span>
+    <span class="meta-pill"><a href="{run_url}" target="_blank">🔗 GitHub Actions</a></span>
+    <a href="global_security_report.html" class="meta-pill-dashboard" target="_blank">
+      📊 Dashboard Final →
+    </a>
+  </div>
+</div>
 
-  <!-- Decision + Score -->
-  <div class="decision fade-in d2">
+<div style="padding:28px 40px">
+
+  <!-- ── DÉCISION + SCORE ── -->
+  <div class="section-label">Décision de déploiement</div>
+  <div class="decision-banner mb-4">
     <div class="score-ring">
-      <svg width="110" height="110" viewBox="0 0 110 110">
-        <circle cx="55" cy="55" r="52" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
-        <circle cx="55" cy="55" r="52" fill="none" stroke="{score_color}" stroke-width="8"
+      <svg width="120" height="120" viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="52" fill="none"
+          stroke="rgba(255,255,255,0.06)" stroke-width="9"/>
+        <circle cx="60" cy="60" r="52" fill="none"
+          stroke="{score_color}" stroke-width="9"
           stroke-dasharray="{dash_fill:.1f} {circumference:.1f}"
-          stroke-linecap="round" style="transition:stroke-dasharray 1s ease"/>
+          stroke-linecap="round"
+          style="transition:stroke-dasharray 1s ease"/>
       </svg>
       <div class="score-center">
-        <div class="score-num">{score}</div>
+        <div class="score-num" style="color:{score_color}">{score}</div>
         <div class="score-sub">/100</div>
       </div>
     </div>
-    <div>
-      <div class="decision-label">{gate_icon} {gate_label}</div>
-      <div class="decision-sub">Score de risque global · {timestamp}</div>
+    <div style="flex:1;min-width:180px">
+      <div class="risk-status-pill {pill_class}">{gate_icon} {gate_label}</div>
+      <p class="decision-reason">{risk_reason}</p>
+    </div>
+    <div class="risk-bar-outer">
+      <div class="risk-bar-inner" style="width:{score}%;background:{score_color}"></div>
     </div>
   </div>
 
-  <!-- Checks table -->
-  <div class="section-lbl d3">Vérifications de sécurité</div>
-  <div class="card fade-in d3">
-    <table>
+  <!-- ── CHECKS TABLE ── -->
+  <div class="section-label">Vérifications de sécurité</div>
+  <div class="card-dark mb-4">
+    <table class="checks-table">
       <thead>
         <tr>
-          <th>Vérification</th>
+          <th style="text-align:left">Vérification</th>
           <th>Valeur</th>
           <th>Max</th>
-          <th style="min-width:100px">Progression</th>
-          <th>Résultat</th>
+          <th style="min-width:120px">Progression</th>
+          <th style="text-align:right">Résultat</th>
         </tr>
       </thead>
       <tbody>{rows_html}</tbody>
     </table>
   </div>
 
-  <!-- Seuils -->
-  <div class="section-lbl">Seuils appliqués</div>
-  <div class="card fade-in d4">
-    <table class="thresh-grid">
+  <!-- ── SEUILS ── -->
+  <div class="section-label">Seuils appliqués</div>
+  <div class="card-dark mb-4">
+    <div class="card-title">⚙️ Configuration — scripts/quality_gate.py</div>
+    <table class="thresh-table">
       <tbody>{thresh_html}</tbody>
     </table>
   </div>
 
   <footer>
-    <span class="live"></span>
-    Quality Gate · DevSecOps WebGoat ·
-    <a href="{run_url}" target="_blank">Run #{run_num}</a>
+    Généré automatiquement · GitHub Actions · Run #{run_num} ·
+    <a href="{run_url}" target="_blank">Voir le pipeline</a>
   </footer>
 
 </div>
 
 <script>
-(function(){{
-  const r=document.documentElement,dm=document.getElementById('dm'),lm=document.getElementById('lm');
-  function st(t){{r.setAttribute('data-theme',t);localStorage.setItem('qg-t',t);
-    [dm,lm].forEach(b=>b.classList.remove('active'));
-    document.getElementById(t==='dark'?'dm':'lm').classList.add('active');}}
-  st(localStorage.getItem('qg-t')||(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'));
-  dm.addEventListener('click',()=>st('dark'));
-  lm.addEventListener('click',()=>st('light'));
+(function () {{
+  const root=document.documentElement,
+        dm=document.getElementById('dark-mode'),
+        lm=document.getElementById('light-mode');
+  function setTheme(t) {{
+    root.setAttribute('data-theme', t);
+    localStorage.setItem('qg-theme', t);
+    [dm, lm].forEach(b => b.classList.remove('active'));
+    document.getElementById(t + '-mode').classList.add('active');
+  }}
+  const saved = localStorage.getItem('qg-theme')
+    || (window.matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
+  setTheme(saved);
+  dm.addEventListener('click', () => setTheme('dark'));
+  lm.addEventListener('click', () => setTheme('light'));
 }})();
 </script>
 </body>
 </html>"""
-
     with open(OUTPUT_FILE, "w", encoding="utf-8") as fh:
         fh.write(html)
     print(f"[OK] Dashboard Quality Gate → {OUTPUT_FILE}")
