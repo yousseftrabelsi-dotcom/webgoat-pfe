@@ -257,9 +257,9 @@ def build_owasp_matrix(trivy: dict, sonar: dict, zap: dict,
             if not covered:
                 html.append(f'<td {td_cell} style="color:#334155;text-align:center;padding:6px;border:1px solid rgba(255,255,255,0.07)">—</td>')
             elif found:
-                html.append(f'<td {td_cell} style="color:#ef4444;text-align:center;font-weight:600;padding:6px;border:1px solid rgba(255,255,255,0.07)">⚠ Trouvé</td>')
+                html.append(f'<td {td_cell} style="text-align:center;font-weight:600;padding:6px;border:1px solid rgba(255,255,255,0.07)"><span style="color:#ef4444 !important">⚠ Trouvé</span></td>')
             else:
-                html.append(f'<td {td_cell} style="color:#22c55e;text-align:center;padding:6px;border:1px solid rgba(255,255,255,0.07)">✓ OK</td>')
+                html.append(f'<td {td_cell} style="text-align:center;padding:6px;border:1px solid rgba(255,255,255,0.07)"><span style="color:#22c55e !important">✓ OK</span></td>')
         html.append('</tr>')
 
     html += ['</tbody></table></div>']
