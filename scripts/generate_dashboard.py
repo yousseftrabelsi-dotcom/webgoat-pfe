@@ -57,41 +57,51 @@ def parse_sonar(path: str = "sonar-results.json") -> dict:
     return data
 
 
-def parse_zap(path: str = "report_html.html") -> dict:
-    demo = {"CORS": 11, "CSRF": 5, "Session": 1, "Auth": 1}
+def parse_zap(path: str = "report_json.json") -> dict:
     counts = {"High": 0, "Medium": 0, "Low": 0, "Informational": 0}
-    if not os.path.isfile(path):
-        print(f"[WARN] ZAP : fichier introuvable — valeurs démo utilisées.", file=sys.stderr)
-        return demo
 
-    # Tentative JSON
-    try:
-        with open(path, encoding="utf-8") as fh:
-            data = json.load(fh)
-        for site in data.get("site", []):
-            for alert in site.get("alerts", []):
-                risk = alert.get("riskdesc", "").split(" ")[0]
-                if risk in counts:
-                    counts[risk] += 1
-        return counts
-    except json.JSONDecodeError:
-        pass
-    except Exception as exc:
-        print(f"[ERROR] ZAP JSON : {exc}", file=sys.stderr)
+    # 1. Essai avec report_json.json (source principale)
+    for candidate in ("report_json.json", "report_html.html"):
+        if not os.path.isfile(candidate):
+            continue
+        try:
+            with open(candidate, encoding="utf-8") as fh:
+                data = json.load(fh)
+            found = False
+            for site in data.get("site", []):
+                for alert in site.get("alerts", []):
+                    # riskdesc peut être "Medium (2)" ou "Medium" → on prend le 1er mot
+                    risk = alert.get("riskdesc", "").split(" ")[0].capitalize()
+                    if risk in counts:
+                        counts[risk] += 1
+                        found = True
+            if found or candidate == "report_json.json":
+                print(f"[INFO] ZAP : {sum(counts.values())} alertes depuis {candidate}")
+                return counts
+        except json.JSONDecodeError:
+            continue
+        except Exception as exc:
+            print(f"[ERROR] ZAP ({candidate}) : {exc}", file=sys.stderr)
 
-    # Fallback : extraction HTML par regex
-    try:
-        with open(path, encoding="utf-8") as fh:
-            html = fh.read()
-        for risk in list(counts.keys()):
-            m = re.search(
-                rf'<td[^>]*>\s*{risk}\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>',
-                html, re.IGNORECASE,
-            )
-            if m:
-                counts[risk] = int(m.group(1))
-    except Exception as exc:
-        print(f"[ERROR] ZAP HTML : {exc}", file=sys.stderr)
+    # 2. Fallback HTML regex
+    html_path = "report_html.html"
+    if os.path.isfile(html_path):
+        try:
+            with open(html_path, encoding="utf-8") as fh:
+                html = fh.read()
+            for risk in list(counts.keys()):
+                m = re.search(
+                    rf'<td[^>]*>\s*{risk}\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>',
+                    html, re.IGNORECASE,
+                )
+                if m:
+                    counts[risk] = int(m.group(1))
+            print(f"[INFO] ZAP : fallback HTML regex utilisé")
+            return counts
+        except Exception as exc:
+            print(f"[ERROR] ZAP HTML fallback : {exc}", file=sys.stderr)
+
+    print("[WARN] ZAP : aucun rapport trouvé — compteurs à zéro.", file=sys.stderr)
     return counts
 
 
@@ -619,20 +629,22 @@ def generate_dashboard():
     }
 
     # ── Figures Plotly ────────────────────────────────────────────
-    f_sca   = fig_sca(trivy_data)
-    f_sast  = fig_sast(sonar_data)
-    f_dast  = fig_dast(zap_data)
-    f_falco = fig_falco(falco_data)
-    f_sec   = fig_secrets(gitleaks_cnt)
-    f_trend = fig_trend()
+    f_sca     = fig_sca(trivy_data)
+    f_sast    = fig_sast(sonar_data)
+    f_dast    = fig_dast(zap_data)
+    f_falco   = fig_falco(falco_data)
+    f_sec     = fig_secrets(gitleaks_cnt)
+    f_trend   = fig_trend()
+    f_checkov = fig_checkov(checkov_data)
 
     # Grille principale (dashboard)
-    g_sca   = f_sca.to_html(full_html=False, include_plotlyjs=False)
-    g_sast  = f_sast.to_html(full_html=False, include_plotlyjs=False)
-    g_dast  = f_dast.to_html(full_html=False, include_plotlyjs=False)
-    g_falco = f_falco.to_html(full_html=False, include_plotlyjs=False)
-    g_sec   = f_sec.to_html(full_html=False, include_plotlyjs=False)
-    g_trend = f_trend.to_html(full_html=False, include_plotlyjs=False)
+    g_sca     = f_sca.to_html(full_html=False, include_plotlyjs=False)
+    g_sast    = f_sast.to_html(full_html=False, include_plotlyjs=False)
+    g_dast    = f_dast.to_html(full_html=False, include_plotlyjs=False)
+    g_falco   = f_falco.to_html(full_html=False, include_plotlyjs=False)
+    g_sec     = f_sec.to_html(full_html=False, include_plotlyjs=False)
+    g_trend   = f_trend.to_html(full_html=False, include_plotlyjs=False)
+    g_checkov = f_checkov.to_html(full_html=False, include_plotlyjs=False)
 
     # Copies dédiées au rapport IA (IDs Plotly distincts)
     ai_sca     = f_sca.to_html(full_html=False, include_plotlyjs=False)
@@ -640,7 +652,7 @@ def generate_dashboard():
     ai_dast    = f_dast.to_html(full_html=False, include_plotlyjs=False)
     ai_falco   = f_falco.to_html(full_html=False, include_plotlyjs=False)
     ai_sec     = f_sec.to_html(full_html=False, include_plotlyjs=False)
-    ai_checkov = fig_checkov(checkov_data).to_html(full_html=False, include_plotlyjs=False)
+    ai_checkov = f_checkov.to_html(full_html=False, include_plotlyjs=False)
 
     # ── Rapport IA : Markdown → HTML + graphiques ─────────────────
     ai_html = md_to_html(ai_raw)
@@ -836,9 +848,13 @@ def generate_dashboard():
     .ai-box {{
       background: linear-gradient(135deg, rgba(6,182,212,.04) 0%, rgba(99,102,241,.04) 100%);
       border: 1px solid rgba(6,182,212,.15);
-      border-radius: 12px; padding: 24px;
+      border-radius: 12px; padding: 28px 36px;
       font-family: 'Space Grotesk', sans-serif;
-      font-size: .75rem; color: var(--muted); line-height: 1.75;
+      font-size: .88rem; color: var(--muted); line-height: 1.85;
+    }}
+    .ai-wrapper {{
+      max-width: 900px;
+      margin: 0 auto;
     }}
     .ai-badge {{
       font-size: .7rem; background: rgba(6,182,212,.15); color: var(--accent);
@@ -863,64 +879,152 @@ def generate_dashboard():
     }}
     [data-theme="light"] .note {{ background: rgba(0,0,0,.03); }}
 
-    /* ── FOOTER ── */
+        /* ── FOOTER ── */
     footer {{
       text-align: center; padding: 28px 0 20px;
       font-family: 'JetBrains Mono', monospace; font-size: .72rem;
       color: var(--muted); border-top: 1px solid var(--border); margin-top: 40px;
     }}
     footer a {{ color: var(--accent); text-decoration: none; }}
-
-    /* ── ACTION CARDS (2 colonnes, même ligne) ── */
+ 
+    /* ── LIVE DOT ── */
+    .live-dot {{
+      display: inline-block; width: 7px; height: 7px;
+      border-radius: 50%; background: var(--ok);
+      margin-right: 6px; vertical-align: middle;
+      animation: livePulse 2s ease-in-out infinite;
+    }}
+    @keyframes livePulse {{
+      0%, 100% {{ box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }}
+      50%       {{ box-shadow: 0 0 0 6px rgba(34,197,94,0); }}
+    }}
+ 
+    /* ── CURSOR BLINK ── */
+    .cursor-blink {{
+      display: inline-block; width: 2px; height: 1em;
+      background: var(--accent); margin-left: 3px;
+      vertical-align: middle;
+      animation: cursorBlink .9s step-end infinite;
+    }}
+    @keyframes cursorBlink {{
+      0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0; }}
+    }}
+ 
+    /* ── HEADER EYEBROW ── */
+    .header-eyebrow {{
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .65rem; letter-spacing: .2em;
+      color: var(--accent); text-transform: uppercase;
+      margin-bottom: 8px;
+      display: flex; align-items: center; gap: 6px;
+    }}
+ 
+    /* ── RISK STATUS BADGE (remplace .badge Bootstrap) ── */
+    .risk-status-pill {{
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 14px; border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .75rem; font-weight: 700;
+      letter-spacing: .08em; text-transform: uppercase;
+      border: 1px solid currentColor;
+      margin-bottom: 6px;
+    }}
+    .risk-status-pill.blocking {{
+      color: var(--danger);
+      background: rgba(239,68,68,0.12);
+      border-color: var(--danger);
+      box-shadow: 0 0 12px rgba(239,68,68,0.2);
+      animation: dangerPulse 2s ease-in-out infinite;
+    }}
+    @keyframes dangerPulse {{
+      0%, 100% {{ box-shadow: 0 0 8px rgba(239,68,68,0.2); }}
+      50%       {{ box-shadow: 0 0 18px rgba(239,68,68,0.45); }}
+    }}
+    .risk-status-pill.ok {{
+      color: var(--ok);
+      background: rgba(34,197,94,0.10);
+      border-color: var(--ok);
+    }}
+    .risk-status-pill.high {{
+      color: var(--warn);
+      background: rgba(249,115,22,0.10);
+      border-color: var(--warn);
+    }}
+    /* ── CARTES D'ACTION ESTHÉTIQUES ── */
     .action-grid {{
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
       gap: 20px;
-      width: 100%;
+      margin: 20px 0 40px 0;
     }}
+
     .action-card {{
-      display: flex; align-items: center; gap: 20px;
-      padding: 22px 28px;
+      display: flex;
+      align-items: center;
+      padding: 20px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      text-decoration: none; color: var(--text);
-      transition: border-color .25s, transform .2s;
-      min-width: 0;
+      border-radius: 12px;
+      text-decoration: none;
+      color: var(--text);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }}
+
     .action-card:hover {{
-      border-color: rgba(56,189,248,.3);
-      transform: translateY(-3px);
+      transform: translateY(-5px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
+      border-color: var(--accent);
     }}
+
     .action-icon {{
-      width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center; font-size: 1.6rem;
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-right: 16px;
+      flex-shrink: 0;
     }}
-    .action-content {{ flex: 1; min-width: 0; }}
+
+    .action-content {{
+      flex-grow: 1;
+    }}
+
     .action-title {{
-      font-weight: 600; font-size: .97rem;
-      display: block; margin-bottom: 5px; color: var(--text);
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 4px;
+      display: block;
     }}
-    .action-desc  {{ font-size: .78rem; color: var(--muted); line-height: 1.5; }}
-    .action-badge {{
-      font-family: 'JetBrains Mono', monospace; font-size: .65rem;
-      letter-spacing: .07em; padding: 2px 8px; border-radius: 6px;
-      margin-top: 8px; display: inline-block;
+
+    .action-desc {{
+      font-size: 0.85rem;
+      opacity: 0.7;
     }}
+
+    .card-slack {{ border-left: 5px solid #4A154B; }}
+    .card-slack .action-icon {{ background: rgba(74, 21, 75, 0.1); color: #4A154B; }}
+
+    .card-gate {{ border-left: 5px solid #2563eb; }}
+    .card-gate .action-icon {{ background: rgba(37, 99, 235, 0.1); color: #2563eb; }}
+
     .action-arrow {{
-      font-size: 1.1rem; color: var(--accent);
-      opacity: 0; flex-shrink: 0;
-      transition: opacity .3s, transform .3s;
-      transform: translateX(-8px);
+      margin-left: 10px;
+      opacity: 0;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      transform: translateX(-10px);
     }}
-    .action-card:hover .action-arrow {{ opacity: 1; transform: translateX(0); }}
-    .card-slack {{ border-left: 3px solid rgba(74,21,75,.8); }}
-    .card-slack .action-icon {{ background:rgba(74,21,75,.2); border:1px solid rgba(74,21,75,.4); }}
-    .card-gate  {{ border-left: 3px solid rgba(37,99,235,.8); }}
-    .card-gate  .action-icon {{ background:rgba(37,99,235,.15); border:1px solid rgba(37,99,235,.4); }}
-  </style>
-</head>
-<body>
+
+    .action-card:hover .action-arrow {{
+      opacity: 1;
+      transform: translateX(0);
+    }}    
+    </style>
 
 <!-- ── THEME TOGGLE ── -->
 <div id="theme-toggle">
@@ -930,7 +1034,10 @@ def generate_dashboard():
 
 <!-- ── HEADER ── -->
 <div class="dash-header">
-  <h1>🛡️ DevSecOps <span>Executive</span> Dashboard</h1>
+  <div class="header-eyebrow">
+    <span class="live-dot"></span>DevSecOps Pipeline &nbsp;·&nbsp; Live Threat Report
+  </div>
+  <h1>🛡️ DevSecOps <span>Executive</span> Dashboard<span class="cursor-blink"></span></h1>
   <p>Pipeline CI/CD — Projet WebGoat</p>
   <div class="meta-row">
     <span class="meta-pill">🔀 {meta['branch']}</span>
@@ -986,38 +1093,44 @@ def generate_dashboard():
       <div class="kpi-val" style="color:{'#ef4444' if checkov_data.get('Critical',0)+checkov_data.get('High',0)>0 else '#22c55e'}">{checkov_data.get('Critical',0)+checkov_data.get('High',0)}</div>
       <div class="kpi-lbl">🏗️ Issues IaC (Checkov)</div>
     </div>
+  <div class="action-grid">
+    
+      <a href="https://app.slack.com/client/T0B0X732287/C0B1AJXL338" target="_blank" class="action-card card-slack">
+        <div class="action-icon">💬</div>
+        <div class="action-content">
+          <span class="action-title">Canal de Notification Slack</span>
+          <span class="action-desc">Consulter l'historique des alertes et les détails envoyés par le Bot.</span>
+        </div>
+        <div class="action-arrow">➜</div>
+      </a>
+
+      <a href="quality-gate-report.html" target="_blank" class="action-card card-gate">
+        <div class="action-icon">⚖️</div>
+        <div class="action-content">
+          <span class="action-title">Décision Quality Gate</span>
+          <span class="action-desc">Analyse détaillée des seuils de sécurité et score final de déploiement.</span>
+        </div>
+        <div class="action-arrow">➜</div>
+      </a>
+
+    </div>
   </div>
 
-  <!-- ── ACTIONS RAPIDES ── -->
-  <div class="section-label">Actions rapides</div>
-  <div class="action-grid mb-4">
-
-    <a href="https://app.slack.com" target="_blank" class="action-card card-slack">
-      <div class="action-icon">💬</div>
-      <div class="action-content">
-        <span class="action-title">Canal de Notification Slack</span>
-        <span class="action-desc">Consulter l'historique des alertes et les détails envoyés par le Bot.</span>
-        <span class="action-badge" style="background:rgba(74,21,75,.25);color:#c084fc;border:1px solid rgba(192,132,252,.25)">#devsecops-alerts</span>
-      </div>
-      <div class="action-arrow">→</div>
-    </a>
-
-    <a href="quality-gate-report.html" target="_blank" class="action-card card-gate">
-      <div class="action-icon">⚖️</div>
-      <div class="action-content">
-        <span class="action-title">Décision Quality Gate</span>
-        <span class="action-desc">Analyse détaillée des seuils de sécurité et score final de déploiement.</span>
-        <span class="action-badge" style="background:rgba(37,99,235,.18);color:#93c5fd;border:1px solid rgba(147,197,253,.25)">quality-gate-report.html</span>
-      </div>
-      <div class="action-arrow">→</div>
-    </a>
-
-  </div>
-
-  <!-- ── GRAPHIQUES 3+3 ── -->
-=======
-  <!-- ── GRAPHIQUES 3 + 3 ── -->
+  <!-- ── GRAPHIQUES DE SÉCURITÉ ── -->
   <div class="section-label">Graphiques de sécurité</div>
+
+  <!-- Tendance centré au-dessus des 6 graphes -->
+  <div class="row g-3 mb-3 justify-content-center">
+    <div class="col-md-6">
+      <div class="card-dark h-100">
+        <div class="card-title">📈 Tendance Sécurité</div>
+        {g_trend}
+        <div class="note">Réduction progressive des vulnérabilités sur les derniers runs.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ligne 1 : SCA · SAST · DAST -->
   <div class="row g-3 mb-3">
     <div class="col-md-4">
       <div class="card-dark h-100">
@@ -1041,8 +1154,8 @@ def generate_dashboard():
       </div>
     </div>
   </div>
-=======
 
+  <!-- Ligne 2 : Falco · Secrets · IaC -->
   <div class="row g-3 mb-4">
     <div class="col-md-4">
       <div class="card-dark h-100">
@@ -1060,30 +1173,11 @@ def generate_dashboard():
     </div>
     <div class="col-md-4">
       <div class="card-dark h-100">
-        <div class="card-title">📈 Tendance Sécurité</div>
-        {g_trend}
-        <div class="note">Réduction progressive des vulnérabilités.</div>
+        <div class="card-title">🏗️ IaC — Checkov</div>
+        {g_checkov}
+        <div class="note">Misconfigurations détectées dans les fichiers IaC.</div>
       </div>
     </div>
-  </div>
-
-  <!-- ── RAPPORT IA ── -->
-  <div class="section-label">Synthèse Intelligence Artificielle</div>
-  <div class="card-dark mb-4">
-    <div class="card-title">
-      🤖 Rapport IA Corrélé
-      <span class="ai-badge">SCA · SAST · DAST · Runtime · Secrets</span>
-=======
-  <!-- ── AI SUMMARY ── -->
-  <div class="section-label">Synthèse Intelligence Artificielle</div>
-  <div class="card-dark mb-4">
-    <div class="card-title">🤖 Rapport IA Corrélé
-      <span style="font-size:.7rem;background:rgba(6,182,212,0.15);color:var(--accent);
-                   padding:2px 10px;border-radius:10px;margin-left:auto">
-        SCA · SAST · DAST · Runtime · Secrets
-      </span>
-    </div>
-    <div class="ai-box">{ai_html}</div>
   </div>
 
   <!-- ── MATRICE OWASP TOP 10 ── -->
@@ -1101,7 +1195,18 @@ def generate_dashboard():
     {owasp_matrix}
   </div>
 
-  <footer>
+<!-- ── SYNTHÈSE IA ── -->
+  <div class="section-label">Synthèse Intelligence Artificielle</div>
+  <div class="ai-wrapper mb-4">
+    <div class="card-dark">
+      <div class="card-title">🤖 Rapport IA Corrélé
+        <span class="ai-badge">SCA · SAST · DAST · Runtime · Secrets · IaC</span>
+      </div>
+      <div class="ai-box">{ai_html}</div>
+    </div>
+  </div>
+
+    <footer>
     Généré automatiquement par GitHub Actions — Run #{meta['run']} —
     <a href="{meta['run_url']}" target="_blank">Voir le pipeline complet</a>
   </footer>
