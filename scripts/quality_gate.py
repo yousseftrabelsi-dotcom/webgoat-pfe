@@ -305,7 +305,7 @@ def main():
     .tb:hover{{transform:translateY(-2px);border-color:var(--accent)}}
     .tb.active{{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}}
 
-    /* ── HEADER (style generate_dashboard) ── */
+    /* ── HEADER ── */
     .dash-header {{
       background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0f172a 100%);
       border-bottom:1px solid var(--border);
@@ -352,7 +352,7 @@ def main():
       animation:cursorBlink .9s step-end infinite;
     }}
     @keyframes cursorBlink{{0%,100%{{opacity:1}}50%{{opacity:0}}}}
-    .meta-row{{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}}
+    .meta-row{{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}}
     .meta-pill {{
       background:rgba(255,255,255,.06);border:1px solid var(--border);
       border-radius:20px;padding:3px 12px;
@@ -360,6 +360,89 @@ def main():
     }}
     [data-theme="light"] .meta-pill{{background:rgba(0,0,0,.04)}}
     .meta-pill a{{color:var(--accent);text-decoration:none}}
+
+    /* ── BACK TO DASHBOARD BUTTON ── */
+    .btn-back {{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 18px;
+      background:rgba(56,189,248,0.08);
+      border:1px solid rgba(56,189,248,0.35);
+      border-radius:22px;
+      font-family:'JetBrains Mono',monospace;
+      font-size:.72rem;font-weight:600;letter-spacing:.06em;
+      color:var(--accent);
+      text-decoration:none;
+      transition:all .25s cubic-bezier(0.4,0,0.2,1);
+      white-space:nowrap;
+      backdrop-filter:blur(8px);
+    }}
+    .btn-back:hover {{
+      background:rgba(56,189,248,0.18);
+      border-color:var(--accent);
+      color:var(--accent);
+      transform:translateY(-2px);
+      box-shadow:0 0 16px rgba(56,189,248,0.25);
+      text-decoration:none;
+    }}
+    .btn-back .arrow {{
+      font-size:.85rem;
+      transition:transform .25s ease;
+    }}
+    .btn-back:hover .arrow {{
+      transform:translateX(-3px);
+    }}
+    [data-theme="light"] .btn-back {{
+      background:rgba(2,132,199,0.07);
+      border-color:rgba(2,132,199,0.3);
+    }}
+    [data-theme="light"] .btn-back:hover {{
+      background:rgba(2,132,199,0.14);
+      box-shadow:0 0 16px rgba(2,132,199,0.2);
+    }}
+
+    /* ── BACK BUTTON FOOTER VARIANT ── */
+    .btn-back-footer {{
+      display:inline-flex;align-items:center;gap:10px;
+      padding:12px 32px;
+      background:linear-gradient(135deg,rgba(56,189,248,0.10) 0%,rgba(129,140,248,0.10) 100%);
+      border:1px solid rgba(56,189,248,0.30);
+      border-radius:12px;
+      font-family:'JetBrains Mono',monospace;
+      font-size:.80rem;font-weight:600;letter-spacing:.07em;
+      color:var(--accent);
+      text-decoration:none;
+      transition:all .3s cubic-bezier(0.4,0,0.2,1);
+      position:relative;overflow:hidden;
+    }}
+    .btn-back-footer::before {{
+      content:'';
+      position:absolute;inset:0;
+      background:linear-gradient(135deg,rgba(56,189,248,0.15) 0%,rgba(129,140,248,0.15) 100%);
+      opacity:0;transition:opacity .3s ease;
+    }}
+    .btn-back-footer:hover::before {{ opacity:1; }}
+    .btn-back-footer:hover {{
+      transform:translateY(-3px);
+      box-shadow:0 8px 24px rgba(56,189,248,0.20);
+      border-color:rgba(56,189,248,0.55);
+      color:var(--accent);
+      text-decoration:none;
+    }}
+    .btn-back-footer .arrow {{
+      font-size:1rem;
+      transition:transform .3s ease;
+    }}
+    .btn-back-footer:hover .arrow {{
+      transform:translateX(-4px);
+    }}
+    [data-theme="light"] .btn-back-footer {{
+      background:linear-gradient(135deg,rgba(2,132,199,0.07) 0%,rgba(99,102,241,0.07) 100%);
+      border-color:rgba(2,132,199,0.28);
+    }}
+    [data-theme="light"] .btn-back-footer:hover {{
+      box-shadow:0 8px 24px rgba(2,132,199,0.18);
+      border-color:rgba(2,132,199,0.5);
+    }}
 
     /* ── GATE STATUS PILL ── */
     .gate-pill {{
@@ -437,11 +520,15 @@ def main():
 
     /* Footer */
     footer{{
-      text-align:center;margin-top:36px;font-size:.67rem;color:var(--muted);
-      border-top:1px solid var(--border);padding-top:20px;
+      text-align:center;margin-top:36px;
+      border-top:1px solid var(--border);padding-top:28px;
+      display:flex;flex-direction:column;align-items:center;gap:20px;
+    }}
+    .footer-meta{{
+      font-size:.67rem;color:var(--muted);
       font-family:'JetBrains Mono',monospace;
     }}
-    footer a{{color:var(--accent);text-decoration:none}}
+    .footer-meta a{{color:var(--accent);text-decoration:none}}
 
     /* Animations */
     .fade-in{{opacity:0;transform:translateY(16px);animation:fadeUp .5s ease forwards}}
@@ -458,7 +545,7 @@ def main():
   <button id="lm" class="tb"        title="Light Mode">☀️</button>
 </div>
 
-<!-- ── HEADER (style generate_dashboard) ── -->
+<!-- ── HEADER ── -->
 <div class="dash-header fade-in d1">
   <div class="header-eyebrow">
     <span class="live-dot"></span>DevSecOps Pipeline &nbsp;·&nbsp; Quality Gate
@@ -472,8 +559,11 @@ def main():
     <span class="meta-pill">👤 {actor}</span>
     <span class="meta-pill">🕐 {timestamp}</span>
     <span class="meta-pill"><a href="{run_url}" target="_blank">🔗 GitHub Actions</a></span>
+    <a href="global_security_report.html" class="btn-back">
+      <span class="arrow">←</span> Dashboard Principal
+    </a>
   </div>
-  <div>
+  <div style="margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <span class="gate-pill {'pass' if all_passed else 'fail'}">
       {gate_icon} {gate_label}
     </span>
@@ -530,9 +620,15 @@ def main():
   </div>
 
   <footer>
-    <span class="live-dot"></span>
-    Quality Gate · DevSecOps WebGoat ·
-    <a href="{run_url}" target="_blank">Run #{run_num}</a>
+    <a href="global_security_report.html" class="btn-back-footer">
+      <span class="arrow">←</span>
+      Retour au Dashboard Principal
+    </a>
+    <div class="footer-meta">
+      <span class="live-dot"></span>
+      Quality Gate · DevSecOps WebGoat ·
+      <a href="{run_url}" target="_blank">Run #{run_num}</a>
+    </div>
   </footer>
 
 </div>
