@@ -242,7 +242,7 @@ def main():
         dot   = "#00ffa3"               if c["passed"] else "#ff3d5a"
         sym   = "✅ PASS"               if c["passed"] else "❌ FAIL"
         sym_c = "#00ffa3"               if c["passed"] else "#ff3d5a"
-        bar_w = min(100, int(c["value"] / max(c["max_allowed"] * 2, 1) * 100)) if c["max_allowed"] > 0 else (100 if c["value"] > 0 else 0)
+        bar_w = min(100, int(c["value"] / max(c["max_allowed"], 1) * 100)) if c["max_allowed"] > 0 else (100 if c["value"] > 0 else 0)
         bar_c = dot
         return f"""
         <tr style="background:{bg};border-bottom:1px solid rgba(0,200,255,0.07)">
