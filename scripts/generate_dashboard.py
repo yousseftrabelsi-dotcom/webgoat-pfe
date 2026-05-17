@@ -60,7 +60,6 @@ def parse_sonar(path: str = "sonar-results.json") -> dict:
 def parse_zap(path: str = "report_json.json") -> dict:
     counts = {"High": 0, "Medium": 0, "Low": 0, "Informational": 0}
 
-    # 1. Essai avec report_json.json (source principale)
     for candidate in ("report_json.json", "report_html.html"):
         if not os.path.isfile(candidate):
             continue
@@ -70,7 +69,6 @@ def parse_zap(path: str = "report_json.json") -> dict:
             found = False
             for site in data.get("site", []):
                 for alert in site.get("alerts", []):
-                    # riskdesc peut être "Medium (2)" ou "Medium" → on prend le 1er mot
                     risk = alert.get("riskdesc", "").split(" ")[0].capitalize()
                     if risk in counts:
                         counts[risk] += 1
@@ -83,7 +81,6 @@ def parse_zap(path: str = "report_json.json") -> dict:
         except Exception as exc:
             print(f"[ERROR] ZAP ({candidate}) : {exc}", file=sys.stderr)
 
-    # 2. Fallback HTML regex
     html_path = "report_html.html"
     if os.path.isfile(html_path):
         try:
@@ -194,14 +191,6 @@ def parse_checkov(path: str = "checkov-results.json") -> dict:
 
 def build_owasp_matrix(trivy: dict, sonar: dict, zap: dict,
                        falco: dict, gitleaks: int, checkov: dict) -> str:
-    """
-    Génère un tableau HTML 10 lignes × outils montrant quelles catégories
-    OWASP sont couvertes et si des findings existent.
-    """
-
-    # Mapping OWASP → (outil, présence de findings, couvert ?)
-    # covered = True  → l'outil détecte ce type de risque
-    # found   = True  → au moins un finding dans ce run
     any_cve      = sum(trivy.values()) > 0
     any_sast     = sonar["vulnerabilities"] > 0 or sonar["bugs"] > 0
     any_zap      = sum(zap.values()) > 0
@@ -209,28 +198,19 @@ def build_owasp_matrix(trivy: dict, sonar: dict, zap: dict,
     any_falco    = falco.get("Error", 0) + falco.get("Critical", 0) > 0
     any_iac      = checkov.get("Critical", 0) + checkov.get("High", 0) > 0
 
-    def _cell(covered: bool, found: bool) -> str:
-        if not covered:
-            return '<td style="color:#475569;text-align:center">—</td>'
-        if found:
-            return '<td style="color:#ef4444;text-align:center;font-weight:600">⚠ Trouvé</td>'
-        return '<td style="color:#22c55e;text-align:center">✓ OK</td>'
-
     rows = [
-        # (id,  catégorie,                        trivy,        sonar,        zap,         secrets,      falco,        checkov)
-        ("A01", "Broken Access Control",           False,        True,         True,         False,        True,         False),
-        ("A02", "Cryptographic Failures",          True,         True,         True,         True,         False,        True),
-        ("A03", "Injection",                       False,        True,         True,         False,        False,        False),
-        ("A04", "Insecure Design",                 False,        True,         True,         False,        False,        True),
-        ("A05", "Security Misconfiguration",       False,        False,        True,         False,        True,         True),
-        ("A06", "Vulnerable & Outdated Components",True,         False,        False,        False,        False,        False),
-        ("A07", "Identification & Auth Failures",  False,        True,         True,         True,         True,         False),
-        ("A08", "Software & Data Integrity Failures",True,       True,         False,        True,         False,        True),
-        ("A09", "Security Logging & Monitoring",   False,        False,        False,        False,        True,         False),
-        ("A10", "Server-Side Request Forgery",     False,        True,         True,         False,        False,        False),
+        ("A01", "Broken Access Control",             False, True,  True,  False, True,  False),
+        ("A02", "Cryptographic Failures",             True,  True,  True,  True,  False, True),
+        ("A03", "Injection",                          False, True,  True,  False, False, False),
+        ("A04", "Insecure Design",                    False, True,  True,  False, False, True),
+        ("A05", "Security Misconfiguration",          False, False, True,  False, True,  True),
+        ("A06", "Vulnerable & Outdated Components",   True,  False, False, False, False, False),
+        ("A07", "Identification & Auth Failures",     False, True,  True,  True,  True,  False),
+        ("A08", "Software & Data Integrity Failures", True,  True,  False, True,  False, True),
+        ("A09", "Security Logging & Monitoring",      False, False, False, False, True,  False),
+        ("A10", "Server-Side Request Forgery",        False, True,  True,  False, False, False),
     ]
 
-    # Données de findings par outil (même ordre que les colonnes du tableau)
     found_map = {
         "trivy":   any_cve,
         "sonar":   any_sast,
@@ -247,7 +227,6 @@ def build_owasp_matrix(trivy: dict, sonar: dict, zap: dict,
                "⚡ Runtime<br><small>Falco</small>",
                "🏗️ IaC<br><small>Checkov</small>"]
 
-    # Style commun
     th = ('style="background:rgba(56,189,248,0.08);color:#7dd3fc;'
           'font-family:\'JetBrains Mono\',monospace;font-size:.7rem;'
           'padding:8px 6px;text-align:center;border:1px solid rgba(255,255,255,0.07)"')
@@ -292,7 +271,6 @@ def build_owasp_matrix(trivy: dict, sonar: dict, zap: dict,
 # ─────────────────────────────────────────────────────────────────────────────
 
 def compute_risk_score(trivy: dict, sonar: dict, falco: dict, gitleaks: int, zap: dict) -> dict:
-    # Secrets en clair = bloquant immédiat
     if gitleaks > 0:
         return {
             "score": 100,
@@ -452,7 +430,6 @@ def fig_secrets(count: int) -> go.Figure:
 
 
 def fig_trend() -> go.Figure:
-    """Graphique de tendance — connecter à des données historiques réelles."""
     x = ["Scan 1", "Scan 2", "Scan 3", "Actuel"]
     y = [120, 95, 60, 40]
     fig = go.Figure()
@@ -473,7 +450,6 @@ def fig_trend() -> go.Figure:
 
 
 def fig_checkov(checkov: dict) -> go.Figure:
-    """Graphique IaC Checkov — checks échoués par sévérité + passés."""
     labels = ["Critical", "High", "Medium", "Low"]
     values = [checkov.get(k, 0) for k in labels]
     colors = ["#ef4444", "#f97316", "#eab308", "#22c55e"]
@@ -515,7 +491,6 @@ def fig_checkov(checkov: dict) -> go.Figure:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def md_to_html(text: str) -> str:
-    """Convertit le Markdown minimal du rapport IA en HTML propre."""
     lines  = text.split("\n")
     out    = []
     in_ul  = False
@@ -571,16 +546,10 @@ def inject_graphs(html_text: str, graphs: dict) -> str:
 
 
 def force_inject_sast(ai_html: str, sast_html: str) -> str:
-    """
-    Si Gemini n'a pas émis [GRAPHIQUE_SAST], l'insère après le titre SAST.
-    SonarCloud ne génère pas de fichier JSON lisible directement — le tag
-    peut donc être absent du rapport IA.
-    """
     wrapper = _GRAPH_WRAPPER.format(sast_html)
     if wrapper in ai_html:
-        return ai_html   # déjà présent
+        return ai_html
 
-    # Cherche un titre h2/h3 mentionnant SAST / SonarCloud
     m = re.search(
         r'(<h[23][^>]*>[^<]*(sast|sonar|code source|code statique)[^<]*</h[23]>)',
         ai_html, re.IGNORECASE,
@@ -588,7 +557,6 @@ def force_inject_sast(ai_html: str, sast_html: str) -> str:
     if m:
         return ai_html.replace(m.group(0), m.group(0) + "\n" + wrapper, 1)
 
-    # Fallback : après le 2ème <h2>
     h2s = list(re.finditer(r'<h2[^>]*>.*?</h2>', ai_html, re.IGNORECASE))
     idx = h2s[1].end() if len(h2s) >= 2 else (h2s[0].end() if h2s else len(ai_html))
     return ai_html[:idx] + "\n" + wrapper + ai_html[idx:]
@@ -637,7 +605,6 @@ def generate_dashboard():
     f_trend   = fig_trend()
     f_checkov = fig_checkov(checkov_data)
 
-    # Grille principale (dashboard)
     g_sca     = f_sca.to_html(full_html=False, include_plotlyjs=False)
     g_sast    = f_sast.to_html(full_html=False, include_plotlyjs=False)
     g_dast    = f_dast.to_html(full_html=False, include_plotlyjs=False)
@@ -646,7 +613,6 @@ def generate_dashboard():
     g_trend   = f_trend.to_html(full_html=False, include_plotlyjs=False)
     g_checkov = f_checkov.to_html(full_html=False, include_plotlyjs=False)
 
-    # Copies dédiées au rapport IA (IDs Plotly distincts)
     ai_sca     = f_sca.to_html(full_html=False, include_plotlyjs=False)
     ai_sast    = f_sast.to_html(full_html=False, include_plotlyjs=False)
     ai_dast    = f_dast.to_html(full_html=False, include_plotlyjs=False)
@@ -662,7 +628,7 @@ def generate_dashboard():
         "GRAPHIQUE_DAST":    ai_dast,
         "GRAPHIQUE_SECRETS": ai_sec,
         "GRAPHIQUE_FALCO":   ai_falco,
-        "GRAPHIQUE_IAC":     ai_checkov,   # ← NOUVEAU
+        "GRAPHIQUE_IAC":     ai_checkov,
     })
     ai_html = force_inject_sast(ai_html, ai_sast)
 
@@ -772,8 +738,6 @@ def generate_dashboard():
     [data-theme="light"] .dash-header h1 {{ color: #0f172a; }}
     .dash-header h1 span {{ color: #7dd3fc; }}
     .dash-header p {{ color: var(--muted); font-size: .85rem; margin-top: 4px; }}
-=======
-    .dash-header h1 span {{ color: #7dd3fc; }}
     .meta-row {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }}
     .meta-pill {{
       background: rgba(255,255,255,.06); border: 1px solid var(--border);
@@ -871,6 +835,7 @@ def generate_dashboard():
     .ai-box strong {{ color: #fbbf24; }}
     .ai-box ul {{ padding-left: 20px; }}
     .ai-box li {{ margin-bottom: 6px; }}
+
     /* ── NOTE BOX ── */
     .note {{
       background: rgba(255,255,255,.03); border-left: 2px solid rgba(148,163,184,.3);
@@ -879,14 +844,14 @@ def generate_dashboard():
     }}
     [data-theme="light"] .note {{ background: rgba(0,0,0,.03); }}
 
-        /* ── FOOTER ── */
+    /* ── FOOTER ── */
     footer {{
       text-align: center; padding: 28px 0 20px;
       font-family: 'JetBrains Mono', monospace; font-size: .72rem;
       color: var(--muted); border-top: 1px solid var(--border); margin-top: 40px;
     }}
     footer a {{ color: var(--accent); text-decoration: none; }}
- 
+
     /* ── LIVE DOT ── */
     .live-dot {{
       display: inline-block; width: 7px; height: 7px;
@@ -898,7 +863,7 @@ def generate_dashboard():
       0%, 100% {{ box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }}
       50%       {{ box-shadow: 0 0 0 6px rgba(34,197,94,0); }}
     }}
- 
+
     /* ── CURSOR BLINK ── */
     .cursor-blink {{
       display: inline-block; width: 2px; height: 1em;
@@ -909,7 +874,7 @@ def generate_dashboard():
     @keyframes cursorBlink {{
       0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0; }}
     }}
- 
+
     /* ── HEADER EYEBROW ── */
     .header-eyebrow {{
       font-family: 'JetBrains Mono', monospace;
@@ -918,8 +883,8 @@ def generate_dashboard():
       margin-bottom: 8px;
       display: flex; align-items: center; gap: 6px;
     }}
- 
-    /* ── RISK STATUS BADGE (remplace .badge Bootstrap) ── */
+
+    /* ── RISK STATUS BADGE ── */
     .risk-status-pill {{
       display: inline-flex; align-items: center; gap: 5px;
       padding: 4px 14px; border-radius: 6px;
@@ -950,12 +915,13 @@ def generate_dashboard():
       background: rgba(249,115,22,0.10);
       border-color: var(--warn);
     }}
-    /* ── CARTES D'ACTION ESTHÉTIQUES ── */
+
+    /* ── CARTES D'ACTION ── */
     .action-grid {{
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-template-columns: repeat(2, 1fr);
       gap: 20px;
-      margin: 20px 0 40px 0;
+      width: 100%;
     }}
 
     .action-card {{
@@ -1023,8 +989,10 @@ def generate_dashboard():
     .action-card:hover .action-arrow {{
       opacity: 1;
       transform: translateX(0);
-    }}    
-    </style>
+    }}
+  </style>
+</head>
+<body>
 
 <!-- ── THEME TOGGLE ── -->
 <div id="theme-toggle">
@@ -1093,27 +1061,27 @@ def generate_dashboard():
       <div class="kpi-val" style="color:{'#ef4444' if checkov_data.get('Critical',0)+checkov_data.get('High',0)>0 else '#22c55e'}">{checkov_data.get('Critical',0)+checkov_data.get('High',0)}</div>
       <div class="kpi-lbl">🏗️ Issues IaC (Checkov)</div>
     </div>
-  <div class="action-grid">
-    
-      <a href="https://app.slack.com/client/T0B0X732287/C0B1AJXL338" target="_blank" class="action-card card-slack">
-        <div class="action-icon">💬</div>
-        <div class="action-content">
-          <span class="action-title">Canal de Notification Slack</span>
-          <span class="action-desc">Consulter l'historique des alertes et les détails envoyés par le Bot.</span>
-        </div>
-        <div class="action-arrow">➜</div>
-      </a>
+  </div>
 
-      <a href="quality-gate-report.html" target="_blank" class="action-card card-gate">
-        <div class="action-icon">⚖️</div>
-        <div class="action-content">
-          <span class="action-title">Décision Quality Gate</span>
-          <span class="action-desc">Analyse détaillée des seuils de sécurité et score final de déploiement.</span>
-        </div>
-        <div class="action-arrow">➜</div>
-      </a>
-
-    </div>
+  <!-- ── ACTIONS RAPIDES ── -->
+  <div class="section-label">Actions Rapides</div>
+  <div class="action-grid mb-4">
+    <a href="https://app.slack.com/client/T0B0X732287/C0B1AJXL338" target="_blank" class="action-card card-slack">
+      <div class="action-icon">💬</div>
+      <div class="action-content">
+        <span class="action-title">Canal de Notification Slack</span>
+        <span class="action-desc">Consulter l'historique des alertes et les détails envoyés par le Bot.</span>
+      </div>
+      <div class="action-arrow">➜</div>
+    </a>
+    <a href="quality-gate-report.html" target="_blank" class="action-card card-gate">
+      <div class="action-icon">⚖️</div>
+      <div class="action-content">
+        <span class="action-title">Décision Quality Gate</span>
+        <span class="action-desc">Analyse détaillée des seuils de sécurité et score final de déploiement.</span>
+      </div>
+      <div class="action-arrow">➜</div>
+    </a>
   </div>
 
   <!-- ── GRAPHIQUES DE SÉCURITÉ ── -->
@@ -1195,7 +1163,7 @@ def generate_dashboard():
     {owasp_matrix}
   </div>
 
-<!-- ── SYNTHÈSE IA ── -->
+  <!-- ── SYNTHÈSE IA ── -->
   <div class="section-label">Synthèse Intelligence Artificielle</div>
   <div class="ai-wrapper mb-4">
     <div class="card-dark">
@@ -1206,7 +1174,7 @@ def generate_dashboard():
     </div>
   </div>
 
-    <footer>
+  <footer>
     Généré automatiquement par GitHub Actions — Run #{meta['run']} —
     <a href="{meta['run_url']}" target="_blank">Voir le pipeline complet</a>
   </footer>
