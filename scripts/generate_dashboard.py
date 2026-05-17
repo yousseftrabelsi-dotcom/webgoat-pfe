@@ -1054,12 +1054,12 @@ def generate_dashboard():
       <div class="kpi-lbl">⚡ Événements Runtime</div>
     </div>
     <div class="kpi">
-      <div class="kpi-val" style="color:{'#22c55e' if risk['score']<40 else '#ef4444'}">{risk['score']}</div>
-      <div class="kpi-lbl">🎯 Score Risque Global</div>
-    </div>
-    <div class="kpi">
       <div class="kpi-val" style="color:{'#ef4444' if checkov_data.get('Critical',0)+checkov_data.get('High',0)>0 else '#22c55e'}">{checkov_data.get('Critical',0)+checkov_data.get('High',0)}</div>
       <div class="kpi-lbl">🏗️ Issues IaC (Checkov)</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val" style="color:{'#22c55e' if risk['score']<40 else '#ef4444'}">{risk['score']}</div>
+      <div class="kpi-lbl">🎯 Score Risque Global</div>
     </div>
   </div>
 
