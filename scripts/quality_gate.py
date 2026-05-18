@@ -232,8 +232,8 @@ def main():
     gate_icon   = "✅" if all_passed else "🚫"
     gate_label  = "DÉPLOIEMENT AUTORISÉ" if all_passed else "DÉPLOIEMENT BLOQUÉ"
 
-    # Score ring — stroke-dasharray trick
-    circumference = 2 * 3.14159 * 52  # r=52
+    # Score ring — stroke-dasharray trick (r=60, size=130)
+    circumference = 2 * 3.14159 * 60  # r=60
     dash_fill = (score / 100) * circumference
     score_color = "#00ffa3" if score < 40 else ("#ff8c00" if score < 70 else "#ff3d5a")
 
@@ -246,18 +246,18 @@ def main():
         bar_c = dot
         return f"""
         <tr style="background:{bg};border-bottom:1px solid rgba(0,200,255,0.07)">
-          <td style="padding:11px 14px;font-size:.78rem;color:#cfe8ff">
+          <td style="padding:14px 18px;font-size:.92rem;color:#cfe8ff">
             <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:{dot};margin-right:8px;box-shadow:0 0 6px {dot}"></span>
             {c['label']}
           </td>
-          <td style="padding:11px 14px;text-align:center;font-weight:700;color:{sym_c};font-size:.85rem;letter-spacing:.05em">{c['value']}</td>
-          <td style="padding:11px 14px;text-align:center;color:#5a8aaa;font-size:.78rem">{c['max_allowed']}</td>
-          <td style="padding:11px 14px;min-width:120px">
-            <div style="background:rgba(255,255,255,0.05);border-radius:3px;height:4px;overflow:hidden">
+          <td style="padding:14px 18px;text-align:center;font-weight:700;color:{sym_c};font-size:1rem;letter-spacing:.05em">{c['value']}</td>
+          <td style="padding:14px 18px;text-align:center;color:#5a8aaa;font-size:.92rem">{c['max_allowed']}</td>
+          <td style="padding:14px 18px;min-width:140px">
+            <div style="background:rgba(255,255,255,0.05);border-radius:3px;height:5px;overflow:hidden">
               <div style="width:{bar_w}%;height:100%;background:{bar_c};border-radius:3px;transition:width .8s ease"></div>
             </div>
           </td>
-          <td style="padding:11px 14px;text-align:right;font-size:.75rem;color:{sym_c};font-weight:600;letter-spacing:.08em">{sym}</td>
+          <td style="padding:14px 18px;text-align:right;font-size:.88rem;color:{sym_c};font-weight:600;letter-spacing:.08em">{sym}</td>
         </tr>"""
 
     rows_html = "".join(check_row(c) for c in checks)
@@ -265,8 +265,8 @@ def main():
     # Seuils table
     def thresh_row(key, val):
         return f"""<tr style="border-bottom:1px solid rgba(0,200,255,0.05)">
-          <td style="padding:7px 14px;color:#5a8aaa;font-size:.72rem;font-family:'IBM Plex Mono',monospace">{key}</td>
-          <td style="padding:7px 14px;text-align:right;color:#00c8ff;font-size:.72rem;font-family:'IBM Plex Mono',monospace;font-weight:600">{val}</td>
+          <td style="padding:10px 18px;color:#5a8aaa;font-size:.85rem;font-family:'IBM Plex Mono',monospace">{key}</td>
+          <td style="padding:10px 18px;text-align:right;color:#00c8ff;font-size:.85rem;font-family:'IBM Plex Mono',monospace;font-weight:600">{val}</td>
         </tr>"""
     thresh_html = "".join(thresh_row(k, v) for k, v in THRESHOLDS.items())
 
@@ -293,7 +293,7 @@ def main():
     }}
     *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
     body{{background:var(--bg);color:var(--text);font-family:var(--font-h);
-          min-height:100vh;overflow-x:hidden;transition:background .3s,color .3s}}
+          min-height:100vh;overflow-x:hidden;transition:background .3s,color .3s;font-size:16px}}
 
     /* ── THEME TOGGLE ── */
     #tgl{{position:fixed;top:20px;right:20px;z-index:9999;display:flex;gap:8px}}
@@ -309,7 +309,7 @@ def main():
     .dash-header {{
       background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0f172a 100%);
       border-bottom:1px solid var(--border);
-      padding:28px 40px 22px;
+      padding:28px 48px 22px;
       position:relative;overflow:hidden;
     }}
     [data-theme="light"] .dash-header {{
@@ -322,7 +322,7 @@ def main():
     }}
     .header-eyebrow {{
       font-family:'JetBrains Mono',monospace;
-      font-size:.65rem;letter-spacing:.2em;
+      font-size:.72rem;letter-spacing:.2em;
       color:var(--accent);text-transform:uppercase;
       margin-bottom:8px;
       display:flex;align-items:center;gap:6px;
@@ -339,12 +339,12 @@ def main():
     }}
     .dash-header h1 {{
       font-family:'JetBrains Mono',monospace;
-      font-size:1.6rem;font-weight:700;letter-spacing:.04em;
+      font-size:1.8rem;font-weight:700;letter-spacing:.04em;
       color:#f8fafc;
     }}
     [data-theme="light"] .dash-header h1{{color:#0f172a}}
     .dash-header h1 span{{color:#7dd3fc}}
-    .dash-header p{{color:var(--muted);font-size:.85rem;margin-top:4px}}
+    .dash-header p{{color:var(--muted);font-size:.92rem;margin-top:4px}}
     .cursor-blink {{
       display:inline-block;width:2px;height:1em;
       background:var(--accent);margin-left:3px;
@@ -355,8 +355,8 @@ def main():
     .meta-row{{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}}
     .meta-pill {{
       background:rgba(255,255,255,.06);border:1px solid var(--border);
-      border-radius:20px;padding:3px 12px;
-      font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted);
+      border-radius:20px;padding:4px 14px;
+      font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--muted);
     }}
     [data-theme="light"] .meta-pill{{background:rgba(0,0,0,.04)}}
     .meta-pill a{{color:var(--accent);text-decoration:none}}
@@ -369,7 +369,7 @@ def main():
       border:1px solid rgba(56,189,248,0.35);
       border-radius:22px;
       font-family:'JetBrains Mono',monospace;
-      font-size:.72rem;font-weight:600;letter-spacing:.06em;
+      font-size:.78rem;font-weight:600;letter-spacing:.06em;
       color:var(--accent);
       text-decoration:none;
       transition:all .25s cubic-bezier(0.4,0,0.2,1);
@@ -408,7 +408,7 @@ def main():
       border:1px solid rgba(56,189,248,0.30);
       border-radius:12px;
       font-family:'JetBrains Mono',monospace;
-      font-size:.80rem;font-weight:600;letter-spacing:.07em;
+      font-size:.88rem;font-weight:600;letter-spacing:.07em;
       color:var(--accent);
       text-decoration:none;
       transition:all .3s cubic-bezier(0.4,0,0.2,1);
@@ -447,9 +447,9 @@ def main():
     /* ── GATE STATUS PILL ── */
     .gate-pill {{
       display:inline-flex;align-items:center;gap:6px;
-      padding:3px 14px;border-radius:20px;
+      padding:4px 16px;border-radius:20px;
       font-family:'JetBrains Mono',monospace;
-      font-size:.75rem;font-weight:700;letter-spacing:.08em;
+      font-size:.82rem;font-weight:700;letter-spacing:.08em;
       border:1px solid currentColor;margin-top:10px;
     }}
     .gate-pill.pass{{color:var(--ok);background:rgba(34,197,94,0.10)}}
@@ -463,10 +463,10 @@ def main():
     }}
 
     /* ── BODY LAYOUT ── */
-    .wrap{{max-width:860px;margin:0 auto;padding:32px 24px 60px}}
+    .wrap{{max-width:100%;margin:0 auto;padding:32px 48px 60px}}
     .section-lbl{{
       font-family:'JetBrains Mono',monospace;
-      font-size:.68rem;font-weight:700;letter-spacing:.14em;
+      font-size:.75rem;font-weight:700;letter-spacing:.14em;
       text-transform:uppercase;color:var(--muted);
       margin:32px 0 12px;
       display:flex;align-items:center;gap:10px;
@@ -477,25 +477,25 @@ def main():
     .decision{{
       background:var(--surface);border:1px solid var(--border);
       border-left:5px solid {gate_color};
-      border-radius:14px;padding:20px 28px;margin-bottom:24px;
-      display:flex;align-items:center;gap:28px;flex-wrap:wrap;
+      border-radius:14px;padding:24px 32px;margin-bottom:24px;
+      display:flex;align-items:center;gap:32px;flex-wrap:wrap;
     }}
     .decision-label{{
-      font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:700;
+      font-family:'JetBrains Mono',monospace;font-size:1.35rem;font-weight:700;
       color:{gate_color};letter-spacing:.02em;
     }}
-    .decision-sub{{font-size:.72rem;color:var(--muted);margin-top:3px}}
-    .score-ring{{position:relative;width:110px;height:110px;flex-shrink:0}}
+    .decision-sub{{font-size:.80rem;color:var(--muted);margin-top:4px}}
+    .score-ring{{position:relative;width:130px;height:130px;flex-shrink:0}}
     .score-ring svg{{transform:rotate(-90deg)}}
     .score-center{{
       position:absolute;inset:0;display:flex;flex-direction:column;
       align-items:center;justify-content:center;
     }}
     .score-num{{
-      font-family:'JetBrains Mono',monospace;font-size:1.5rem;font-weight:700;
+      font-family:'JetBrains Mono',monospace;font-size:1.9rem;font-weight:700;
       color:{score_color};line-height:1;
     }}
-    .score-sub{{font-size:.6rem;color:var(--muted);letter-spacing:.08em}}
+    .score-sub{{font-size:.65rem;color:var(--muted);letter-spacing:.08em}}
 
     /* Checks table */
     .card{{
@@ -507,7 +507,7 @@ def main():
     table{{width:100%;border-collapse:collapse}}
     thead tr{{background:rgba(56,189,248,0.05)}}
     thead th{{
-      padding:10px 14px;font-size:.67rem;letter-spacing:.12em;
+      padding:13px 18px;font-size:.78rem;letter-spacing:.12em;
       text-transform:uppercase;color:var(--muted);text-align:left;
       border-bottom:1px solid var(--border2);
       font-family:'JetBrains Mono',monospace;
@@ -525,7 +525,7 @@ def main():
       display:flex;flex-direction:column;align-items:center;gap:20px;
     }}
     .footer-meta{{
-      font-size:.67rem;color:var(--muted);
+      font-size:.75rem;color:var(--muted);
       font-family:'JetBrains Mono',monospace;
     }}
     .footer-meta a{{color:var(--accent);text-decoration:none}}
@@ -577,9 +577,9 @@ def main():
   <div class="section-lbl d2">Décision finale</div>
   <div class="decision fade-in d2">
     <div class="score-ring">
-      <svg width="110" height="110" viewBox="0 0 110 110">
-        <circle cx="55" cy="55" r="52" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
-        <circle cx="55" cy="55" r="52" fill="none" stroke="{score_color}" stroke-width="8"
+      <svg width="130" height="130" viewBox="0 0 130 130">
+        <circle cx="65" cy="65" r="60" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="9"/>
+        <circle cx="65" cy="65" r="60" fill="none" stroke="{score_color}" stroke-width="9"
           stroke-dasharray="{dash_fill:.1f} {circumference:.1f}"
           stroke-linecap="round" style="transition:stroke-dasharray 1s ease"/>
       </svg>
@@ -603,7 +603,7 @@ def main():
           <th>Vérification</th>
           <th>Valeur</th>
           <th>Max</th>
-          <th style="min-width:100px">Progression</th>
+          <th style="min-width:140px">Progression</th>
           <th>Résultat</th>
         </tr>
       </thead>
