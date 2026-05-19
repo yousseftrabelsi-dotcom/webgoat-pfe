@@ -4,6 +4,12 @@ scripts/ai_analyzer.py
 Analyse IA corrélée — Pipeline DevSecOps WebGoat
 Agrège les rapports SCA · SAST · DAST · Secrets · Runtime · IaC et génère
 une synthèse Markdown enrichie via Gemini.
+
+FIX : _extract_trivy_kpis() remplace l'envoi du JSON brut Trivy.
+      Le fichier trivy-results.json fait ~637 Ko et les Vulnerabilities
+      commencent à l'octet ~39 000 — bien après la limite MAX_CHARS=12 000.
+      Gemini ne voyait donc que les métadonnées de packages (sans CVE)
+      et concluait à tort "aucune vulnérabilité détectée".
 ──────────────────────────────────────────────────────────────────────────────
 """
 
@@ -22,18 +28,17 @@ OUTPUT_FILE  = "ai-security-summary.txt"
 MAX_CHARS    = 12_000
 MAX_RETRIES  = 5
 RETRY_DELAY  = 30
-GEMINI_MODEL = "gemini-2.5-flash"   # 2.5-flash 
+GEMINI_MODEL = "gemini-2.5-flash"
 
-# Rapports à intégrer — IaC Checkov ajouté
+# Rapports à intégrer
 REPORTS = {
     "Trivy / SCA — Dépendances":       "trivy-results.json",
     "SonarCloud / SAST — Code source": "sonar-results.json",
-    "OWASP ZAP / DAST — Web":          "report_json.json",   # JSON = alertes réelles
+    "OWASP ZAP / DAST — Web":          "report_json.json",
     "Gitleaks / Secrets":              "results.sarif",
     "Falco / Runtime":                 "falco-results.json",
 }
 
-# Checkov : plusieurs noms possibles selon la version de iac_scan.py
 CHECKOV_CANDIDATES = [
     "checkov-results.json",
     "checkov_results.json",
@@ -49,6 +54,93 @@ CHECKOV_CANDIDATES = [
 def _write_output(text: str) -> None:
     with open(OUTPUT_FILE, "w", encoding="utf-8") as fh:
         fh.write(text)
+
+
+# ── NOUVEAU : extracteur Trivy ────────────────────────────────────────────────
+def _extract_trivy_kpis(path: str) -> str:
+    """
+    Extrait un résumé structuré du rapport Trivy JSON.
+
+    POURQUOI : trivy-results.json fait ~637 Ko. La clé "Vulnerabilities"
+    n'apparaît qu'à partir de l'octet ~39 000, bien après la limite
+    MAX_CHARS = 12 000. En envoyant le JSON brut tronqué, Gemini ne voyait
+    que les métadonnées de packages et concluait "aucune CVE détectée".
+    Cette fonction lit le fichier complet, agrège les CVE par sévérité et
+    fournit un résumé compact (~1-2 Ko) fidèle à la réalité.
+    """
+    import json
+
+    counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
+    critical_vulns: list[dict] = []
+    high_vulns:     list[dict] = []
+    packages_seen:  set[str]   = set()
+
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception as exc:
+        print(f"  [WARN] Lecture Trivy : {exc}", file=sys.stderr)
+        return ""
+
+    for result in data.get("Results", []):
+        target = result.get("Target", "")
+        for v in result.get("Vulnerabilities", []):
+            sev = v.get("Severity", "UNKNOWN").upper()
+            counts[sev] = counts.get(sev, 0) + 1
+            packages_seen.add(v.get("PkgName", ""))
+
+            entry = {
+                "id":        v.get("VulnerabilityID", ""),
+                "pkg":       v.get("PkgName", ""),
+                "installed": v.get("InstalledVersion", ""),
+                "fixed":     v.get("FixedVersion") or "non disponible",
+                "title":     (v.get("Title") or v.get("Description") or "")[:100],
+                "target":    target,
+            }
+            if sev == "CRITICAL" and len(critical_vulns) < 10:
+                critical_vulns.append(entry)
+            elif sev == "HIGH" and len(high_vulns) < 8:
+                high_vulns.append(entry)
+
+    total = sum(counts.values())
+    if total == 0:
+        return (
+            "Résultats Trivy SCA :\n"
+            "  ✅ Aucune CVE détectée dans les dépendances.\n"
+            f"  (fichier analysé : {path})"
+        )
+
+    lines = [
+        "Résultats Trivy SCA — Vulnérabilités détectées dans les dépendances :",
+        f"  📦 Total CVE          : {total}",
+        f"  🔴 CRITICAL           : {counts['CRITICAL']}",
+        f"  🟠 HIGH               : {counts['HIGH']}",
+        f"  🟡 MEDIUM             : {counts['MEDIUM']}",
+        f"  🟢 LOW                : {counts['LOW']}",
+        f"  📂 Packages affectés  : {len(packages_seen)}",
+    ]
+
+    if critical_vulns:
+        lines.append(f"\n  ⚠️  CVE CRITIQUES ({counts['CRITICAL']} au total — détail des {len(critical_vulns)} premières) :")
+        for v in critical_vulns:
+            lines.append(f"    [{v['id']}] {v['pkg']} {v['installed']}")
+            lines.append(f"      Titre   : {v['title']}")
+            lines.append(f"      Fix     : {v['fixed']}")
+            lines.append(f"      Cible   : {v['target']}")
+
+    if high_vulns:
+        lines.append(f"\n  🔶 CVE HIGH ({counts['HIGH']} au total — détail des {len(high_vulns)} premières) :")
+        for v in high_vulns:
+            lines.append(f"    [{v['id']}] {v['pkg']} {v['installed']} → fix: {v['fixed']}")
+            if v['title']:
+                lines.append(f"      {v['title']}")
+
+    if counts['MEDIUM'] > 0:
+        lines.append(f"\n  ℹ️  {counts['MEDIUM']} CVE MEDIUM non détaillées ici — consulter trivy-results.json.")
+    if counts['LOW'] > 0:
+        lines.append(f"  ℹ️  {counts['LOW']} CVE LOW non détaillées ici.")
+
+    return "\n".join(lines)
 
 
 def _extract_sonar_kpis(path: str) -> str:
@@ -80,10 +172,6 @@ def _extract_sonar_kpis(path: str) -> str:
 
 
 def _extract_zap_kpis(path: str) -> str:
-    """
-    Extrait les alertes ZAP depuis report_json.json et les formate
-    en texte lisible — évite d'envoyer le JSON brut volumineux à Gemini.
-    """
     import json
     try:
         with open(path, encoding="utf-8") as fh:
@@ -98,7 +186,6 @@ def _extract_zap_kpis(path: str) -> str:
             lines.append(f"\n  Site scanné : {site_name}")
             lines.append(f"  Nombre d'alertes : {len(alerts)}")
 
-            # Grouper par niveau de risque
             by_risk = {"High": [], "Medium": [], "Low": [], "Informational": []}
             for alert in alerts:
                 risk = alert.get("riskdesc", "").split(" ")[0]
@@ -110,14 +197,14 @@ def _extract_zap_kpis(path: str) -> str:
                 if not alert_list:
                     continue
                 lines.append(f"\n  🔴 {risk_level} ({len(alert_list)} alertes) :")
-                for a in alert_list[:5]:   # max 5 par niveau
+                for a in alert_list[:5]:
                     name = a.get("alert", a.get("name", "—"))
                     desc = a.get("desc", "")[:120].replace("\n", " ")
                     lines.append(f"    - {name}")
                     if desc:
                         lines.append(f"      {desc}")
                 if len(alert_list) > 5:
-                    lines.append(f"    … et {len(alert_list)-5} autres alertes {risk_level}")
+                    lines.append(f"    ... et {len(alert_list)-5} autres alertes {risk_level}")
 
         lines.append(f"\n  Total alertes détectées : {total_alerts}")
         return "\n".join(lines) if total_alerts > 0 else ""
@@ -128,10 +215,6 @@ def _extract_zap_kpis(path: str) -> str:
 
 
 def _extract_gitleaks_kpis(path: str) -> str:
-    """
-    Extrait les secrets détectés depuis results.sarif et les formate
-    en texte structuré pour Gemini — évite d'envoyer le SARIF brut complet.
-    """
     import json
     try:
         with open(path, encoding="utf-8") as fh:
@@ -153,7 +236,6 @@ def _extract_gitleaks_kpis(path: str) -> str:
         lines.append(f"  ⚠️  {count} secret(s) en clair détecté(s) — CRITIQUE")
         lines.append("\n  Détail des secrets (max 15) :")
 
-        # Grouper par type de règle
         by_rule = {}
         for r in results:
             rule_id = r.get("ruleId", "unknown")
@@ -183,10 +265,6 @@ def _extract_gitleaks_kpis(path: str) -> str:
 
 
 def _extract_checkov_kpis(path: str) -> str:
-    """
-    Extrait un résumé lisible du rapport Checkov JSON.
-    Évite d'envoyer tout le JSON brut à Gemini.
-    """
     import json
     try:
         with open(path, encoding="utf-8") as fh:
@@ -210,7 +288,6 @@ def _extract_checkov_kpis(path: str) -> str:
                 else:
                     severities["LOW"] += 1
 
-                # Garde les 10 premiers checks échoués pour contexte IA
                 if len(failed_checks) < 10:
                     failed_checks.append({
                         "id":       chk.get("check_id", "—"),
@@ -259,33 +336,43 @@ def build_context() -> str:
 
         print(f"  [OK]   Intégration : {label}")
 
-        # Traitement spécifique SonarCloud
+        # ── Trivy SCA — NOUVEAU extracteur (évite la troncature à 12 000 chars) ──
+        if "trivy" in filepath.lower():
+            trivy_text = _extract_trivy_kpis(filepath)
+            if trivy_text:
+                context_parts.append(
+                    f"\n\n=== RÉSULTATS {label.upper()} ===\n{trivy_text}\n"
+                )
+            continue
+
+        # ── SonarCloud ──
         if "sonar" in filepath.lower():
             sonar_text = _extract_sonar_kpis(filepath)
             if sonar_text:
                 context_parts.append(
                     f"\n\n=== RÉSULTATS {label.upper()} ===\n{sonar_text}\n"
                 )
-                continue
+            continue
 
-        # Traitement spécifique ZAP — JSON alertes
+        # ── ZAP JSON ──
         if "report_json" in filepath.lower() or "zap" in filepath.lower():
             zap_text = _extract_zap_kpis(filepath)
             if zap_text:
                 context_parts.append(
                     f"\n\n=== RÉSULTATS {label.upper()} ===\n{zap_text}\n"
                 )
-                continue
+            continue
 
-        # Traitement spécifique Gitleaks — SARIF complet → résumé structuré
+        # ── Gitleaks SARIF ──
         if "results.sarif" in filepath.lower() or "gitleaks" in filepath.lower():
             gl_text = _extract_gitleaks_kpis(filepath)
             if gl_text:
                 context_parts.append(
                     f"\n\n=== RÉSULTATS {label.upper()} ===\n{gl_text}\n"
                 )
-                continue
+            continue
 
+        # ── Fichiers génériques (Falco JSON ligne par ligne, etc.) ──
         try:
             with open(filepath, encoding="utf-8") as fh:
                 content = fh.read()
@@ -295,7 +382,7 @@ def build_context() -> str:
         except Exception as exc:
             print(f"  [ERROR] Lecture {filepath} : {exc}", file=sys.stderr)
 
-    # ── Checkov IaC : recherche parmi plusieurs noms de fichiers ──
+    # ── Checkov IaC ──
     checkov_file = next((p for p in CHECKOV_CANDIDATES if os.path.exists(p)), None)
     if checkov_file:
         print(f"  [OK]   Intégration : Checkov / IaC — Infrastructure ({checkov_file})")
@@ -311,7 +398,7 @@ def build_context() -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. PROMPT — Section IaC ajoutée
+# 4. PROMPT
 # ─────────────────────────────────────────────────────────────────────────────
 
 PROMPT_TEMPLATE = """
@@ -345,7 +432,7 @@ Corrèle avec les vulnérabilités SCA si des patterns communs existent.
 [GRAPHIQUE_SAST]
 
 ## 4. Analyse DAST — Sécurité Web (OWASP ZAP)
-Détail des alertes web (injections, CORS, CSRF, sessions, authentification…).
+Détail des alertes web (injections, CORS, CSRF, sessions, authentification...).
 [GRAPHIQUE_DAST]
 
 ## 5. Analyse Secrets — Gitleaks
@@ -407,7 +494,7 @@ def call_gemini(prompt: str) -> str | None:
             is_retryable = any(code in msg for code in ("503", "500", "Resource exhausted", "overloaded"))
 
             if is_retryable and attempt < MAX_RETRIES:
-                print(f"  Pause {RETRY_DELAY}s avant nouvel essai…", file=sys.stderr)
+                print(f"  Pause {RETRY_DELAY}s avant nouvel essai...", file=sys.stderr)
                 time.sleep(RETRY_DELAY)
             elif not is_retryable:
                 print("  Erreur non-récupérable, abandon.", file=sys.stderr)
@@ -425,7 +512,7 @@ def main() -> None:
     print("  Analyse IA corrélée — Pipeline DevSecOps WebGoat")
     print("═" * 60)
 
-    print("\n[1/3] Lecture des rapports disponibles…")
+    print("\n[1/3] Lecture des rapports disponibles...")
     context = build_context()
 
     if not context.strip():
@@ -437,7 +524,7 @@ def main() -> None:
         _write_output(fallback)
         sys.exit(0)
 
-    print("\n[2/3] Envoi à Gemini pour analyse…")
+    print("\n[2/3] Envoi à Gemini pour analyse...")
     prompt = PROMPT_TEMPLATE.format(context=context)
     result = call_gemini(prompt)
 
@@ -451,7 +538,7 @@ def main() -> None:
         print(f"\n[FAIL] {error_msg}", file=sys.stderr)
         sys.exit(1)
 
-    print("\n[3/3] Sauvegarde du rapport IA…")
+    print("\n[3/3] Sauvegarde du rapport IA...")
     _write_output(result)
 
     lines = result.count("\n")
