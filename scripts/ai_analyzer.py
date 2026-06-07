@@ -402,7 +402,7 @@ def build_context() -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 PROMPT_TEMPLATE = """
-Tu es un expert DevSecOps senior. Voici les rapports de sécurité complets générés par le
+Tu es un expert DevSecOps junior. Voici les rapports de sécurité complets générés par le
 pipeline CI/CD du projet WebGoat :
 
 {context}
